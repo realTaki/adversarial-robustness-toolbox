@@ -25,7 +25,7 @@ jobs:
     container: minhitbk/art_testing_envs:deepspeech_v3
     steps:
       - name: Checkout Repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v7
       - name: Run Test Action
         uses: ./.github/actions/deepspeech-v3
       - name: Upload coverage to Codecov
@@ -38,7 +38,7 @@ jobs:
     container: adversarialrobustnesstoolbox/art_testing_envs:deepspeech_v3_torch_1_10
     steps:
       - name: Checkout Repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v7
       - name: Run Test Action
         uses: ./.github/actions/deepspeech-v3
       - name: Upload coverage to Codecov
