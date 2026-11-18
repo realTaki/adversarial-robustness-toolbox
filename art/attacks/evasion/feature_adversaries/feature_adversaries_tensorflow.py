@@ -20,8 +20,11 @@ This module implements the Feature Adversaries attack in TensorFlow v2.
 
 | Paper link: https://arxiv.org/abs/1511.05122
 """
+
+from __future__ import annotations
+
 import logging
-from typing import TYPE_CHECKING, Optional, Tuple, Union
+from typing import TYPE_CHECKING
 
 import numpy as np
 from tqdm.auto import trange
@@ -30,7 +33,7 @@ from art.attacks.attack import EvasionAttack
 from art.estimators.estimator import BaseEstimator, NeuralNetworkMixin
 
 if TYPE_CHECKING:
-    # pylint: disable=C0412
+
     import tensorflow as tf
     from tensorflow.keras.optimizers import Optimizer
 
@@ -65,13 +68,13 @@ class FeatureAdversariesTensorFlowV2(EvasionAttack):
         self,
         estimator: "TENSORFLOWV2_ESTIMATOR_TYPE",
         delta: float,
-        optimizer: Optional["Optimizer"] = None,
-        optimizer_kwargs: Optional[dict] = None,
+        optimizer: "Optimizer" | None = None,
+        optimizer_kwargs: dict | None = None,
         lambda_: float = 0.0,
-        layer: Union[int, str, Tuple[int, ...], Tuple[str, ...]] = -1,
+        layer: int | str | tuple[int, ...] | tuple[str, ...] = -1,
         max_iter: int = 100,
         batch_size: int = 32,
-        step_size: Optional[Union[int, float]] = None,
+        step_size: int | float | None = None,
         random_start: bool = False,
         verbose: bool = True,
     ):
@@ -113,7 +116,7 @@ class FeatureAdversariesTensorFlowV2(EvasionAttack):
         :param y: Guide samples.
         :return: Batch of adversarial examples.
         """
-        import tensorflow as tf  # lgtm [py/repeated-import]
+        import tensorflow as tf
 
         def loss_fn(source_orig, source_adv, guide):
             representation_loss = tf.zeros(shape=(source_orig.shape[0],), dtype=tf.float32)
@@ -174,7 +177,7 @@ class FeatureAdversariesTensorFlowV2(EvasionAttack):
                 perturbation.assign(adv - x)
         return adv
 
-    def generate(self, x: np.ndarray, y: Optional[np.ndarray] = None, **kwargs) -> np.ndarray:
+    def generate(self, x: np.ndarray, y: np.ndarray | None = None, **kwargs) -> np.ndarray:
         """
         Generate adversarial samples and return them in an array.
 
@@ -182,7 +185,7 @@ class FeatureAdversariesTensorFlowV2(EvasionAttack):
         :param y: Guide samples.
         :return: Adversarial examples.
         """
-        import tensorflow as tf  # lgtm [py/repeated-import]
+        import tensorflow as tf
 
         if y is None:
             raise ValueError("The value of guide `y` cannot be None. Please provide a `np.ndarray` of guide inputs.")

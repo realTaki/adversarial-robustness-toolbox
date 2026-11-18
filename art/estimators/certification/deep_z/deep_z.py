@@ -20,7 +20,8 @@ This module implements DeepZ proposed in Fast and Effective Robustness Certifica
 
 | Paper link: https://papers.nips.cc/paper/2018/file/f2f446980d8e971ef3da97af089481c3-Paper.pdf
 """
-from typing import Tuple, Union
+
+from __future__ import annotations
 
 import numpy as np
 import torch
@@ -44,13 +45,23 @@ class ZonoDenseLayer(torch.nn.Module):
 
     def forward(self, x: "torch.Tensor") -> "torch.Tensor":
         """
-        Forward pass through the dense layer.
+        Abstract forward pass through the dense layer.
 
         :param x: input zonotope to the dense layer.
         :return: zonotope after being pushed through the dense layer.
         """
         x = self.zonotope_matmul(x)
         x = self.zonotope_add(x)
+        return x
+
+    def concrete_forward(self, x: "torch.Tensor") -> "torch.Tensor":
+        """
+        Concrete forward pass through the dense layer.
+
+        :param x: concrete input to the dense layer.
+        :return: concrete dense layer outputs.
+        """
+        x = torch.matmul(x, torch.transpose(self.weight, 0, 1)) + self.bias
         return x
 
     def zonotope_matmul(self, x: "torch.Tensor") -> "torch.Tensor":
@@ -125,7 +136,7 @@ class ZonoBounds:
 
         return np.sign(lbs) < 0 and np.sign(ubs) < 0
 
-    def zonotope_get_bounds(self, cent: "torch.Tensor", eps: "torch.Tensor") -> Tuple[list, list]:
+    def zonotope_get_bounds(self, cent: "torch.Tensor", eps: "torch.Tensor") -> tuple[list, list]:
         """
         Compute the upper and lower bounds for the final zonotopes
 
@@ -147,7 +158,7 @@ class ZonoBounds:
         return upper_bounds_output, lower_bounds_output
 
     @staticmethod
-    def adjust_to_within_bounds(cent: np.ndarray, eps: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    def adjust_to_within_bounds(cent: np.ndarray, eps: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         """
         Simple helper function to pre-process and adjust zonotope values to be within 0 - 1 range.
         This is written with image data from MNIST and CIFAR10 in mind using L-infty bounds.
@@ -170,7 +181,7 @@ class ZonoBounds:
 
         return cent, eps
 
-    def pre_process(self, cent: np.ndarray, eps: np.ndarray):
+    def pre_process(self, cent: np.ndarray, eps: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         """
         Simple helper function to reshape and adjust the zonotope values before pushing through the neural network.
         This is written with image data from MNIST and CIFAR10 in mind using L-infty bounds.
@@ -203,10 +214,10 @@ class ZonoConv(torch.nn.Module):
         self,
         in_channels: int,
         out_channels: int,
-        kernel_size: Union[int, Tuple[int, int]],
-        stride: Union[int, Tuple[int, int]],
-        dilation: Union[int, Tuple[int, int]] = 1,
-        padding: Union[int, Tuple[int, int]] = 0,
+        kernel_size: int | tuple[int, int],
+        stride: int | tuple[int, int],
+        dilation: int | tuple[int, int] = 1,
+        padding: int | tuple[int, int] = 0,
     ):
         super().__init__()
         self.conv = torch.nn.Conv2d(
@@ -229,7 +240,7 @@ class ZonoConv(torch.nn.Module):
 
     def forward(self, x: "torch.Tensor") -> "torch.Tensor":
         """
-        Forward pass through the convolutional layer
+        Abstract forward pass through the convolutional layer
 
         :param x: input zonotope to the convolutional layer.
         :return x: zonotope after being pushed through the convolutional layer.
@@ -237,6 +248,19 @@ class ZonoConv(torch.nn.Module):
         x = self.conv(x)
         x = self.zonotope_add(x)
         return x
+
+    def concrete_forward(self, x: "torch.Tensor") -> "torch.Tensor":
+        """
+        Concrete forward pass through the convolutional layer
+
+        :param x: concrete input to the convolutional layer.
+        :return: concrete convolutional layer outputs.
+        """
+        x = self.conv(x)
+        bias = torch.unsqueeze(self.bias, dim=-1)
+        bias = torch.unsqueeze(bias, dim=-1)
+        bias = torch.unsqueeze(bias, dim=0)
+        return x + bias
 
     def zonotope_add(self, x: "torch.Tensor") -> "torch.Tensor":
         """
@@ -263,6 +287,7 @@ class ZonoReLU(torch.nn.Module, ZonoBounds):
     def __init__(self, device="cpu"):
         super().__init__()
         self.device = device
+        self.concrete_activation = torch.nn.ReLU()
 
     def __call__(self, x: "torch.Tensor") -> "torch.Tensor":
         return self.forward(x)
@@ -276,11 +301,20 @@ class ZonoReLU(torch.nn.Module, ZonoBounds):
         """
         return self.zonotope_relu(x)
 
+    def concrete_forward(self, x: "torch.Tensor") -> "torch.Tensor":
+        """
+        Concrete pass through the ReLU function
+
+        :param x: concrete input to the activation function.
+        :return: concrete outputs from the ReLU.
+        """
+        return self.concrete_activation(x)
+
     def zonotope_relu(self, x: "torch.Tensor") -> "torch.Tensor":
         """
-        Implements "DeepZ" for relu.
+        Implements "DeepZ" for ReLU.
 
-        :param x: input zonotope
+        :param x: input zonotope.
         :return x: zonotope after application of the relu. May have grown in dimension if crossing relus occur.
         """
         original_shape = x.shape

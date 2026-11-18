@@ -18,11 +18,13 @@
 """
 Creates a Deep Partition Aggregation ensemble classifier.
 """
-from __future__ import absolute_import, division, print_function, unicode_literals
 
+from __future__ import absolute_import, division, print_function, unicode_literals, annotations
+
+from collections.abc import Callable
 import logging
 import warnings
-from typing import List, Optional, Union, Callable, Dict, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 import copy
 import numpy as np
@@ -52,13 +54,13 @@ class DeepPartitionEnsemble(EnsembleClassifier):
 
     def __init__(
         self,
-        classifiers: Union["CLASSIFIER_NEURALNETWORK_TYPE", List["CLASSIFIER_NEURALNETWORK_TYPE"]],
-        hash_function: Optional[Callable] = None,
+        classifiers: "CLASSIFIER_NEURALNETWORK_TYPE" | list["CLASSIFIER_NEURALNETWORK_TYPE"],
+        hash_function: Callable | None = None,
         ensemble_size: int = 50,
         channels_first: bool = False,
-        clip_values: Optional["CLIP_VALUES_TYPE"] = None,
-        preprocessing_defences: Union["Preprocessor", List["Preprocessor"], None] = None,
-        postprocessing_defences: Union["Postprocessor", List["Postprocessor"], None] = None,
+        clip_values: "CLIP_VALUES_TYPE" | None = None,
+        preprocessing_defences: "Preprocessor" | list["Preprocessor"] | None = None,
+        postprocessing_defences: "Postprocessor" | list["Postprocessor"] | None = None,
         preprocessing: "PREPROCESSING_TYPE" = (0.0, 1.0),
     ) -> None:
         """
@@ -81,12 +83,10 @@ class DeepPartitionEnsemble(EnsembleClassifier):
         """
         self.can_fit = False  # self.fit() cannot be used with models loaded from disk
         if not isinstance(classifiers, list):
-            warnings.warn(
-                "If a single classifier is passed, it should not have been loaded \
+            warnings.warn("If a single classifier is passed, it should not have been loaded \
                 from disk due to cloning errors with models loaded from disk. If you are \
                 using pre-trained model(s), create a list of Estimator objects the same \
-                length as the ensemble size"
-            )
+                length as the ensemble size")
             self.can_fit = True
 
             if hasattr(classifiers, "clone_for_refitting"):
@@ -122,7 +122,7 @@ class DeepPartitionEnsemble(EnsembleClassifier):
 
         self.ensemble_size = ensemble_size
 
-    def predict(  # pylint: disable=W0221
+    def predict(
         self, x: np.ndarray, batch_size: int = 128, raw: bool = False, max_aggregate: bool = True, **kwargs
     ) -> np.ndarray:
         """
@@ -146,7 +146,7 @@ class DeepPartitionEnsemble(EnsembleClassifier):
         # Aggregate based on top-1 prediction from each classifier
         if max_aggregate:
             preds = super().predict(x, batch_size=batch_size, raw=True, **kwargs)
-            aggregated_preds = np.zeros_like(preds, shape=preds.shape[1:])  # pylint: disable=E1123
+            aggregated_preds = np.zeros_like(preds, shape=preds.shape[1:])
             for i in range(preds.shape[0]):
                 aggregated_preds[np.arange(len(aggregated_preds)), np.argmax(preds[i], axis=1)] += 1
             return aggregated_preds
@@ -154,14 +154,14 @@ class DeepPartitionEnsemble(EnsembleClassifier):
         # Aggregate based on summing predictions from each classifier
         return super().predict(x, batch_size=batch_size, raw=False, **kwargs)
 
-    def fit(  # pylint: disable=W0221
+    def fit(
         self,
         x: np.ndarray,
         y: np.ndarray,
         batch_size: int = 128,
         nb_epochs: int = 20,
-        train_dict: Dict = None,
-        **kwargs
+        train_dict: dict | None = None,
+        **kwargs,
     ) -> None:
         """
         Fit the classifier on the training set `(x, y)`. Each classifier will be trained with the
@@ -179,7 +179,7 @@ class DeepPartitionEnsemble(EnsembleClassifier):
         """
         if self.can_fit:
             # First, partition the data using the hash function
-            partition_ind = [[] for _ in range(self.ensemble_size)]  # type: List[List[int]]
+            partition_ind = [[] for _ in range(self.ensemble_size)]  # type: list[list[int]]
             for i, p_x in enumerate(x):
                 partition_id = int(self.hash_function(p_x))
                 partition_ind[partition_id].append(i)

@@ -20,7 +20,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import logging
 import unittest
 
-from keras_preprocessing.image import ImageDataGenerator
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
 import numpy as np
 
 from art.data_generators import KerasDataGenerator
@@ -44,16 +44,8 @@ class TestActivationDefence(unittest.TestCase):
         cls.mnist = (x_train, y_train), (x_test, y_test), (min_, max_)
 
         # Create simple keras model
-        import tensorflow as tf
-
-        tf_version = [int(v) for v in tf.__version__.split(".")]
-        if tf_version[0] == 2 and tf_version[1] >= 3:
-            tf.compat.v1.disable_eager_execution()
-            from tensorflow.keras.models import Sequential
-            from tensorflow.keras.layers import Dense, Flatten, Conv2D, MaxPooling2D
-        else:
-            from keras.models import Sequential
-            from keras.layers import Dense, Flatten, Conv2D, MaxPooling2D
+        from tensorflow.keras.models import Sequential
+        from tensorflow.keras.layers import Dense, Flatten, Conv2D, MaxPooling2D
 
         model = Sequential()
         model.add(Conv2D(32, kernel_size=(3, 3), activation="relu", input_shape=x_train.shape[1:]))
@@ -100,6 +92,10 @@ class TestActivationDefence(unittest.TestCase):
     def test_wrong_parameters_4(self):
         self.defence.set_params(cluster_analysis="what")
 
+    def test_wrong_parameters_5(self):
+        with self.assertRaises(ValueError):
+            self.defence.set_params(ex_re_threshold=-1)
+
     def test_activations(self):
         (x_train, _), (_, _), (_, _) = self.mnist
         activations = self.defence._get_activations()
@@ -114,7 +110,7 @@ class TestActivationDefence(unittest.TestCase):
             clusters_by_class, _ = self.defence.cluster_activations(nb_clusters=nb_clusters)
 
             # Verify expected number of classes
-            self.assertEqual(np.shape(clusters_by_class)[0], n_classes)
+            self.assertEqual(len(clusters_by_class), n_classes)
             # Check we get the expected number of clusters:
             found_clusters = len(np.unique(clusters_by_class[0]))
             self.assertEqual(found_clusters, nb_clusters)
@@ -128,10 +124,10 @@ class TestActivationDefence(unittest.TestCase):
         # Get MNIST
         (x_train, _), (_, _), (_, _) = self.mnist
 
-        _, is_clean_lst = self.defence.detect_poison(nb_clusters=2, nb_dims=10, reduce="PCA")
+        _, is_clean_lst = self.defence.detect_poison(nb_clusters=2, nb_dims=10, reduce="PCA", ex_re_threshold=1)
         sum_clean1 = sum(is_clean_lst)
 
-        _, is_clean_lst_gen = self.defence_gen.detect_poison(nb_clusters=2, nb_dims=10, reduce="PCA")
+        _, is_clean_lst_gen = self.defence_gen.detect_poison(nb_clusters=2, nb_dims=10, reduce="PCA", ex_re_threshold=1)
         sum_clean1_gen = sum(is_clean_lst_gen)
 
         # Check number of items in is_clean
@@ -145,10 +141,10 @@ class TestActivationDefence(unittest.TestCase):
         self.assertEqual(found_clusters_gen, 2)
 
         _, is_clean_lst = self.defence.detect_poison(
-            nb_clusters=3, nb_dims=10, reduce="PCA", cluster_analysis="distance"
+            nb_clusters=3, nb_dims=10, reduce="PCA", cluster_analysis="distance", ex_re_threshold=1
         )
         _, is_clean_lst_gen = self.defence_gen.detect_poison(
-            nb_clusters=3, nb_dims=10, reduce="PCA", cluster_analysis="distance"
+            nb_clusters=3, nb_dims=10, reduce="PCA", cluster_analysis="distance", ex_re_threshold=1
         )
         self.assertEqual(len(x_train), len(is_clean_lst))
         self.assertEqual(len(x_train), len(is_clean_lst_gen))
@@ -165,12 +161,24 @@ class TestActivationDefence(unittest.TestCase):
         self.assertNotEqual(sum_clean1, sum_clean2)
         self.assertNotEqual(sum_clean1_gen, sum_clean2_gen)
 
-        kwargs = {"nb_clusters": 2, "nb_dims": 10, "reduce": "PCA", "cluster_analysis": "distance"}
+        kwargs = {
+            "nb_clusters": 2,
+            "nb_dims": 10,
+            "reduce": "PCA",
+            "cluster_analysis": "distance",
+            "ex_re_threshold": None,
+        }
         _, is_clean_lst = self.defence.detect_poison(**kwargs)
         _, is_clean_lst_gen = self.defence_gen.detect_poison(**kwargs)
         sum_dist = sum(is_clean_lst)
         sum_dist_gen = sum(is_clean_lst_gen)
-        kwargs = {"nb_clusters": 2, "nb_dims": 10, "reduce": "PCA", "cluster_analysis": "smaller"}
+        kwargs = {
+            "nb_clusters": 2,
+            "nb_dims": 10,
+            "reduce": "PCA",
+            "cluster_analysis": "smaller",
+            "ex_re_threshold": None,
+        }
         _, is_clean_lst = self.defence.detect_poison(**kwargs)
         _, is_clean_lst_gen = self.defence_gen.detect_poison(**kwargs)
         sum_size = sum(is_clean_lst)
@@ -247,20 +255,6 @@ class TestActivationDefence(unittest.TestCase):
         self.defence_gen.detect_poison(nb_clusters=2, nb_dims=10, reduce="PCA")
         self.defence.plot_clusters(save=False)
         self.defence_gen.plot_clusters(save=False)
-
-    def test_pickle(self):
-
-        # Test pickle and unpickle:
-        filename = "test_pickle.h5"
-        ActivationDefence._pickle_classifier(self.classifier, filename)
-        loaded = ActivationDefence._unpickle_classifier(filename)
-
-        np.testing.assert_equal(self.classifier._clip_values, loaded._clip_values)
-        self.assertEqual(self.classifier._channels_first, loaded._channels_first)
-        self.assertEqual(self.classifier._use_logits, loaded._use_logits)
-        self.assertEqual(self.classifier._input_layer, loaded._input_layer)
-
-        ActivationDefence._remove_pickle(filename)
 
     def test_fix_relabel_poison(self):
         (x_train, y_train), (_, _), (_, _) = self.mnist

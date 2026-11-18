@@ -18,9 +18,10 @@
 """
 Module providing convenience functions.
 """
-# pylint: disable=C0302
-from __future__ import absolute_import, division, print_function, unicode_literals
 
+from __future__ import absolute_import, division, print_function, unicode_literals, annotations
+
+from collections.abc import Callable
 import logging
 import math
 import os
@@ -31,11 +32,11 @@ import warnings
 import zipfile
 from functools import wraps
 from inspect import signature
-from typing import TYPE_CHECKING, Callable, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Optional, Tuple, Union
 
 import numpy as np
 import six
-from scipy.special import gammainc  # pylint: disable=E0611
+from scipy.special import gammainc
 from tqdm.auto import tqdm
 
 from art import config
@@ -49,16 +50,16 @@ logger = logging.getLogger(__name__)
 # ------------------------------------------------------------------------------------------------- CONSTANTS AND TYPES
 
 
-DATASET_TYPE = Tuple[  # pylint: disable=C0103
+DATASET_TYPE = Tuple[  # pylint: disable=invalid-name
     Tuple[np.ndarray, np.ndarray], Tuple[np.ndarray, np.ndarray], float, float
 ]
-CLIP_VALUES_TYPE = Tuple[Union[int, float, np.ndarray], Union[int, float, np.ndarray]]  # pylint: disable=C0103
+CLIP_VALUES_TYPE = Tuple[Union[int, float, np.ndarray], Union[int, float, np.ndarray]]  # pylint: disable=invalid-name
 
 if TYPE_CHECKING:
-    # pylint: disable=R0401,C0412
+    # pylint: disable=cyclic-import
     from art.defences.preprocessor.preprocessor import Preprocessor
 
-    PREPROCESSING_TYPE = Optional[  # pylint: disable=C0103
+    PREPROCESSING_TYPE = Optional[  # pylint: disable=invalid-name
         Union[
             Tuple[Union[int, float, np.ndarray], Union[int, float, np.ndarray]], Preprocessor, Tuple[Preprocessor, ...]
         ]
@@ -79,7 +80,6 @@ if TYPE_CHECKING:
     from art.estimators.classification.keras import KerasClassifier
     from art.experimental.estimators.classification.jax import JaxClassifier
     from art.estimators.classification.lightgbm import LightGBMClassifier
-    from art.estimators.classification.mxnet import MXClassifier
     from art.estimators.classification.pytorch import PyTorchClassifier
     from art.estimators.classification.query_efficient_bb import QueryEfficientGradientEstimationClassifier
     from art.estimators.classification.scikitlearn import (
@@ -95,60 +95,60 @@ if TYPE_CHECKING:
         ScikitlearnRandomForestClassifier,
         ScikitlearnSVC,
     )
-    from art.estimators.classification.tensorflow import TensorFlowClassifier, TensorFlowV2Classifier
+    from art.estimators.classification.tensorflow import TensorFlowV2Classifier
     from art.estimators.classification.xgboost import XGBoostClassifier
-    from art.estimators.generation import TensorFlowGenerator
-    from art.estimators.generation.tensorflow import TensorFlow2Generator
+    from art.estimators.certification.deep_z import PytorchDeepZ
+    from art.estimators.certification.interval import PyTorchIBPClassifier
+    from art.estimators.certification.derandomized_smoothing.ablators import BlockAblator, ColumnAblator
+    from art.estimators.generation.tensorflow import TensorFlowV2Generator
     from art.estimators.object_detection.object_detector import ObjectDetector
-    from art.estimators.object_detection.python_object_detector import PyTorchObjectDetector
+    from art.estimators.object_detection.pytorch_object_detector import PyTorchObjectDetector
     from art.estimators.object_detection.pytorch_faster_rcnn import PyTorchFasterRCNN
-    from art.estimators.object_detection.tensorflow_faster_rcnn import TensorFlowFasterRCNN
+    from art.estimators.object_detection.pytorch_yolo import PyTorchYolo
+    from art.estimators.object_detection.tensorflow_v2_faster_rcnn import TensorFlowV2FasterRCNN
     from art.estimators.pytorch import PyTorchEstimator
+    from art.estimators.keras import KerasEstimator
     from art.estimators.regression.scikitlearn import ScikitlearnRegressor
+    from art.estimators.regression.pytorch import PyTorchRegressor
+    from art.estimators.regression.keras import KerasRegressor
+    from art.estimators.regression.blackbox import BlackBoxRegressor
     from art.estimators.speech_recognition.pytorch_deep_speech import PyTorchDeepSpeech
-    from art.estimators.speech_recognition.tensorflow_lingvo import TensorFlowLingvoASR
     from art.estimators.tensorflow import TensorFlowV2Estimator
 
-    CLASSIFIER_LOSS_GRADIENTS_TYPE = Union[  # pylint: disable=C0103
+    CLASSIFIER_LOSS_GRADIENTS_TYPE = Union[  # pylint: disable=invalid-name
         ClassifierLossGradients,
         EnsembleClassifier,
         GPyGaussianProcessClassifier,
         KerasClassifier,
         JaxClassifier,
-        MXClassifier,
         PyTorchClassifier,
         ScikitlearnLogisticRegression,
         ScikitlearnSVC,
-        TensorFlowClassifier,
         TensorFlowV2Classifier,
         QueryEfficientGradientEstimationClassifier,
     ]
 
-    CLASSIFIER_CLASS_LOSS_GRADIENTS_TYPE = Union[  # pylint: disable=C0103
+    CLASSIFIER_CLASS_LOSS_GRADIENTS_TYPE = Union[  # pylint: disable=invalid-name
         ClassifierClassLossGradients,
         EnsembleClassifier,
         GPyGaussianProcessClassifier,
         KerasClassifier,
-        MXClassifier,
         PyTorchClassifier,
         ScikitlearnLogisticRegression,
         ScikitlearnSVC,
-        TensorFlowClassifier,
         TensorFlowV2Classifier,
     ]
 
-    CLASSIFIER_NEURALNETWORK_TYPE = Union[  # pylint: disable=C0103
+    CLASSIFIER_NEURALNETWORK_TYPE = Union[  # pylint: disable=invalid-name
         ClassifierNeuralNetwork,
         DetectorClassifier,
         EnsembleClassifier,
         KerasClassifier,
-        MXClassifier,
         PyTorchClassifier,
-        TensorFlowClassifier,
         TensorFlowV2Classifier,
     ]
 
-    CLASSIFIER_DECISION_TREE_TYPE = Union[  # pylint: disable=C0103
+    CLASSIFIER_DECISION_TREE_TYPE = Union[  # pylint: disable=invalid-name
         ClassifierDecisionTree,
         LightGBMClassifier,
         ScikitlearnDecisionTreeClassifier,
@@ -158,7 +158,7 @@ if TYPE_CHECKING:
         XGBoostClassifier,
     ]
 
-    CLASSIFIER_TYPE = Union[  # pylint: disable=C0103
+    CLASSIFIER_TYPE = Union[  # pylint: disable=invalid-name
         Classifier,
         BlackBoxClassifier,
         CatBoostARTClassifier,
@@ -168,7 +168,6 @@ if TYPE_CHECKING:
         KerasClassifier,
         JaxClassifier,
         LightGBMClassifier,
-        MXClassifier,
         PyTorchClassifier,
         ScikitlearnClassifier,
         ScikitlearnDecisionTreeClassifier,
@@ -180,44 +179,75 @@ if TYPE_CHECKING:
         ScikitlearnRandomForestClassifier,
         ScikitlearnLogisticRegression,
         ScikitlearnSVC,
-        TensorFlowClassifier,
         TensorFlowV2Classifier,
         XGBoostClassifier,
         CLASSIFIER_NEURALNETWORK_TYPE,
     ]
 
-    GENERATOR_TYPE = Union[TensorFlowGenerator, TensorFlow2Generator]  # pylint: disable=C0103
+    GENERATOR_TYPE = Union[TensorFlowV2Generator]  # pylint: disable=invalid-name
 
-    REGRESSOR_TYPE = Union[ScikitlearnRegressor, ScikitlearnDecisionTreeRegressor]  # pylint: disable=C0103
+    REGRESSOR_TYPE = Union[  # pylint: disable=invalid-name
+        ScikitlearnRegressor, ScikitlearnDecisionTreeRegressor, PyTorchRegressor, KerasRegressor, BlackBoxRegressor
+    ]
 
-    OBJECT_DETECTOR_TYPE = Union[  # pylint: disable=C0103
+    OBJECT_DETECTOR_TYPE = Union[  # pylint: disable=invalid-name
         ObjectDetector,
         PyTorchObjectDetector,
         PyTorchFasterRCNN,
-        TensorFlowFasterRCNN,
+        PyTorchYolo,
+        TensorFlowV2FasterRCNN,
     ]
 
-    SPEECH_RECOGNIZER_TYPE = Union[  # pylint: disable=C0103
-        PyTorchDeepSpeech,
-        TensorFlowLingvoASR,
-    ]
+    SPEECH_RECOGNIZER_TYPE = Union[PyTorchDeepSpeech,]  # pylint: disable=invalid-name
 
-    PYTORCH_ESTIMATOR_TYPE = Union[  # pylint: disable=C0103
+    PYTORCH_ESTIMATOR_TYPE = Union[  # pylint: disable=invalid-name
         PyTorchClassifier,
         PyTorchDeepSpeech,
         PyTorchEstimator,
         PyTorchObjectDetector,
         PyTorchFasterRCNN,
+        PyTorchYolo,
+        PyTorchRegressor,
     ]
 
-    TENSORFLOWV2_ESTIMATOR_TYPE = Union[  # pylint: disable=C0103
+    PYTORCH_OBJECT_DETECTOR_TYPE = Union[PyTorchObjectDetector]  # pylint: disable=invalid-name
+
+    KERAS_ESTIMATOR_TYPE = Union[  # pylint: disable=invalid-name
+        KerasClassifier,
+        KerasEstimator,
+        KerasRegressor,
+    ]
+
+    TENSORFLOWV2_ESTIMATOR_TYPE = Union[  # pylint: disable=invalid-name
         TensorFlowV2Classifier,
         TensorFlowV2Estimator,
+        TensorFlowV2FasterRCNN,
     ]
 
-    ESTIMATOR_TYPE = Union[  # pylint: disable=C0103
-        CLASSIFIER_TYPE, REGRESSOR_TYPE, OBJECT_DETECTOR_TYPE, SPEECH_RECOGNIZER_TYPE
+    ESTIMATOR_TYPE = Union[  # pylint: disable=invalid-name
+        CLASSIFIER_TYPE,
+        REGRESSOR_TYPE,
+        OBJECT_DETECTOR_TYPE,
+        SPEECH_RECOGNIZER_TYPE,
+        PYTORCH_ESTIMATOR_TYPE,
+        KERAS_ESTIMATOR_TYPE,
+        TENSORFLOWV2_ESTIMATOR_TYPE,
     ]
+
+    CLONABLE = Union[  # pylint: disable=invalid-name
+        ScikitlearnClassifier,
+        PyTorchClassifier,
+        TensorFlowV2Classifier,
+        KerasEstimator,
+        PyTorchRegressor,
+        ScikitlearnRegressor,
+        XGBoostClassifier,
+    ]
+
+    ABLATOR_TYPE = Union[BlockAblator, ColumnAblator]  # pylint: disable=invalid-name
+
+    CERTIFIER_TYPE = Union[PytorchDeepZ]  # pylint: disable=invalid-name
+    IBP_CERTIFIER_TYPE = Union[PyTorchIBPClassifier]  # pylint: disable=invalid-name
 
 # --------------------------------------------------------------------------------------------------------- DEPRECATION
 
@@ -285,7 +315,7 @@ def deprecated_keyword_arg(identifier: str, end_version: str, *, reason: str = "
     Deprecate a keyword argument and raise a `DeprecationWarning`.
 
     The `@deprecated_keyword_arg` decorator is used to deprecate keyword arguments. The deprecated keyword argument must
-    default to `Deprecated`. Several use cases are supported. For example one can use it to to rename a keyword
+    default to `Deprecated`. Several use cases are supported. For example one can use it to rename a keyword
     identifier. The following code examples provide different use cases of how to use the decorator.
 
     .. code-block:: python
@@ -338,7 +368,7 @@ def deprecated_keyword_arg(identifier: str, end_version: str, *, reason: str = "
 # ----------------------------------------------------------------------------------------------------- MATH OPERATIONS
 
 
-def projection_l1_1(values: np.ndarray, eps: Union[int, float, np.ndarray]) -> np.ndarray:
+def projection_l1_1(values: np.ndarray, eps: int | float | np.ndarray) -> np.ndarray:
     """
     This function computes the orthogonal projections of a batch of points on L1-balls of given radii
     The batch size is  m = values.shape[0].  The points are flattened to dimension
@@ -348,11 +378,11 @@ def projection_l1_1(values: np.ndarray, eps: Union[int, float, np.ndarray]) -> n
     a[j+1] +...+ a[n-1] - a[j]*(n-j-1) >= eps. The  ith  coordinate of projection is equal to  0
     if i=0,...,j.
 
-    :param values:  A batch of  m  points, each an ndarray
+    :param values:  A batch of  m  points, each a ndarray
     :param eps:  The radii of the respective L1-balls
     :return: projections
     """
-    # pylint: disable=C0103
+    # pylint: disable=invalid-name
 
     shp = values.shape
     a = values.copy()
@@ -370,13 +400,13 @@ def projection_l1_1(values: np.ndarray, eps: Union[int, float, np.ndarray]) -> n
     mat = np.zeros((m, 2))
 
     #   if  a_sorted[i, n-1]  >= a_sorted[i, n-2] + eps,  then the projection is  [0,...,0,eps]
-    done = False
+    done = early_done = False
     active = np.array([1] * m)
     after_vec = np.zeros((m, n))
     proj = a_sorted.copy()
     j = n - 2
     while j >= 0:
-        mat[:, 0] = mat[:, 0] + a_sorted[:, j + 1]  # =  sum(a_sorted[: i] :  i = j + 1,...,n-1
+        mat[:, 0] += a_sorted[:, j + 1]  # =  sum(a_sorted[: i] :  i = j + 1,...,n-1
         mat[:, 1] = a_sorted[:, j] * (n - j - 1) + eps
         #  Find the max in each problem  max{ sum{a_sorted[:, i] : i=j+1,..,n-1} , a_sorted[:, j] * (n-j-1) + eps }
         row_maxes = np.max(mat, axis=1)
@@ -390,21 +420,29 @@ def projection_l1_1(values: np.ndarray, eps: Union[int, float, np.ndarray]) -> n
         #  has to be reduced is  delta
         delta = (mat[:, 0] - eps) / (n - j - 1)
         #    The vector of reductions
-        delta_vec = np.array([delta] * (n - j - 1))
-        delta_vec = np.transpose(delta_vec)
+        delta_vec = np.transpose(np.array([delta] * (n - j - 1)))
         #   The sub-vectors:  a_sorted[:, (j+1):]
-        a_sub = a_sorted[:, (j + 1) :]
+        a_sub = a_sorted[:, int(j + 1) :]
         #   After reduction by delta_vec
         a_after = a_sub - delta_vec
-        after_vec[:, (j + 1) :] = a_after
-        proj = (act_multiplier * after_vec) + ((1 - act_multiplier) * proj)
+        after_vec[:, int(j + 1) :] = a_after
+        proj += act_multiplier * (after_vec - proj)
         active = active * ind_set
         if sum(active) == 0:
-            done = True
+            done = early_done = True
             break
         j -= 1
+    if not early_done:
+        delta = (mat[:, 0] + a_sorted[:, 0] - eps) / n
+        ind_set = np.sign(np.maximum(delta, 0))
+        act_multiplier = ind_set * active
+        act_multiplier = np.transpose([np.transpose(act_multiplier)] * n)
+        delta_vec = np.transpose(np.array([delta] * n))
+        a_after = a_sorted - delta_vec
+        proj += act_multiplier * (a_after - proj)
+        done = True
     if not done:
-        proj = active * a_sorted + (1 - active) * proj
+        proj = active * (a_sorted - proj)
 
     for i in range(m):
         proj[i, :] = proj[i, a_argsort_inv[i, :]]
@@ -415,7 +453,7 @@ def projection_l1_1(values: np.ndarray, eps: Union[int, float, np.ndarray]) -> n
     return proj
 
 
-def projection_l1_2(values: np.ndarray, eps: Union[int, float, np.ndarray]) -> np.ndarray:
+def projection_l1_2(values: np.ndarray, eps: int | float | np.ndarray) -> np.ndarray:
     """
     This function computes the orthogonal projections of a batch of points on L1-balls of given radii
     The batch size is  m = values.shape[0].  The points are flattened to dimension
@@ -427,11 +465,11 @@ def projection_l1_2(values: np.ndarray, eps: Union[int, float, np.ndarray]) -> n
     If  t = (a1 + ... + an - 1)/n , then  a' is the desired projection.  Otherwise, the problem is reduced to
     finding the projection of  (a1 - t, ... , a{n-1} - t ).
 
-    :param values:  A batch of  m  points, each an ndarray
+    :param values:  A batch of  m  points, each a ndarray
     :param eps:  The radii of the respective L1-balls
     :return: projections
     """
-    # pylint: disable=C0103
+    # pylint: disable=invalid-name
     shp = values.shape
     a = values.copy()
     n = np.prod(a.shape[1:])
@@ -455,7 +493,7 @@ def projection_l1_2(values: np.ndarray, eps: Union[int, float, np.ndarray]) -> n
         mat0[:, 1] = np.min(mat, axis=1)
         min_t = np.max(mat0, axis=1)
         if np.max(min_t) < 1e-8:
-            break
+            continue
         row_sums = row_sums - a_var[:, j] * (n - j)
         a_var[:, (j + 1) :] = a_var[:, (j + 1) :] - np.matmul(min_t.reshape((m, 1)), np.ones((1, n - j - 1)))
         a_var[:, j] = a_var[:, j] - min_t
@@ -468,67 +506,72 @@ def projection_l1_2(values: np.ndarray, eps: Union[int, float, np.ndarray]) -> n
     return proj
 
 
-def projection(values: np.ndarray, eps: Union[int, float, np.ndarray], norm_p: Union[int, float, str]) -> np.ndarray:
+def projection(
+    values: np.ndarray,
+    eps: int | float | np.ndarray,
+    norm_p: int | float | str,
+    *,
+    suboptimal: bool = True,
+) -> np.ndarray:
     """
     Project `values` on the L_p norm ball of size `eps`.
 
     :param values: Array of perturbations to clip.
-    :param eps: Maximum norm allowed.
-    :param norm_p: L_p norm to use for clipping.
-            Only 1, 2 , `np.Inf` 1.1 and 1.2 supported for now.
-            1.1 and 1.2 compute orthogonal projections on l1-ball, using two different algorithms
+    :param eps: If a scalar, the norm of the L_p ball onto which samples are projected. Equivalently in general, can be
+                any array of non-negatives broadcastable with `values`, and the projection occurs onto the unit ball
+                for the weighted L_{p, w} norm with `w = 1 / eps`. Currently, for any given sample, non-uniform weights
+                are only supported with infinity norm. Example: To specify sample-wise scalar, you can provide
+                `eps.shape = (n_samples,) + (1,) * values[0].ndim`.
+    :param norm_p: Lp norm to use for clipping, with `norm_p > 0`. Only 1, 2, `np.inf` and "inf" are currently
+                   supported with `suboptimal=False` for now.
+    :param suboptimal: If `True` simply projects by rescaling to Lp ball. Fast but may be suboptimal for `norm_p != 2`.
+                       Ignored when `norm_p in [np.inf, "inf"]` because optimal solution is fast. Defaults to `True`.
     :return: Values of `values` after projection.
     """
-    # Pick a small scalar to avoid division by 0
-    tol = 10e-8
-    values_tmp = values.reshape((values.shape[0], -1))
+    norm = np.inf if norm_p == "inf" else float(norm_p)
+    assert norm > 0
 
-    if norm_p == 2:
-        if isinstance(eps, np.ndarray):
-            raise NotImplementedError("The parameter `eps` of type `np.ndarray` is not supported to use with norm 2.")
+    values_tmp = values.reshape(len(values), -1)  # (n_samples, d)
 
-        values_tmp = values_tmp * np.expand_dims(
-            np.minimum(1.0, eps / (np.linalg.norm(values_tmp, axis=1) + tol)), axis=1
-        )
-
-    elif norm_p == 1:
-        if isinstance(eps, np.ndarray):
-            raise NotImplementedError("The parameter `eps` of type `np.ndarray` is not supported to use with norm 1.")
-
-        values_tmp = values_tmp * np.expand_dims(
-            np.minimum(1.0, eps / (np.linalg.norm(values_tmp, axis=1, ord=1) + tol)),
-            axis=1,
-        )
-    elif norm_p == 1.1:
-        values_tmp = projection_l1_1(values_tmp, eps)
-    elif norm_p == 1.2:
-        values_tmp = projection_l1_2(values_tmp, eps)
-
-    elif norm_p in [np.inf, "inf"]:
-        if isinstance(eps, np.ndarray):
-            eps = eps * np.ones_like(values)
-            eps = eps.reshape([eps.shape[0], -1])  # type: ignore
-
-        values_tmp = np.sign(values_tmp) * np.minimum(abs(values_tmp), eps)
-
-    else:
+    eps = np.broadcast_to(eps, values.shape)
+    eps = eps.reshape(len(eps), -1)  # (n_samples, d)
+    assert np.all(eps >= 0)
+    if norm != np.inf and not np.all(eps == eps[:, [0]]):
         raise NotImplementedError(
-            'Values of `norm_p` different from 1, 2, `np.inf` and "inf" are currently not ' "supported."
+            "Projection onto the weighted L_p ball is currently not supported with finite `norm_p`."
         )
 
-    values = values_tmp.reshape(values.shape)
+    if (suboptimal or norm == 2) and norm != np.inf:  # Simple rescaling
+        values_norm = np.linalg.norm(values_tmp, ord=norm, axis=1, keepdims=True)  # (n_samples, 1)
+        with np.errstate(divide="ignore"):
+            values_tmp = values_tmp * np.where(values_norm, np.minimum(1, eps / values_norm), 0)
+    else:  # Optimal
+        if norm == np.inf:  # Easy exact case
+            values_tmp = np.sign(values_tmp) * np.minimum(np.abs(values_tmp), eps)
+        elif norm == 1:  # Harder exact case
+            projection_l1 = projection_l1_1 if values_tmp.shape[1] > 29 else projection_l1_2  # From empirical tests
+            values_tmp = projection_l1(values_tmp, eps[:, 0])
+        elif norm > 1:  # Convex optim
+            raise NotImplementedError(
+                'Values of `norm_p > 1` different from 2, `np.inf` and "inf" are currently not supported with '
+                "`suboptimal=False`."
+            )
+        else:  # Non-convex optim
+            raise NotImplementedError("Values of `norm_p < 1` are currently not supported with `suboptimal=False`.")
 
+    values = values_tmp.reshape(values.shape).astype(values.dtype)
     return values
 
 
 def random_sphere(
     nb_points: int,
     nb_dims: int,
-    radius: Union[int, float, np.ndarray],
-    norm: Union[int, float, str],
+    radius: int | float | np.ndarray,
+    norm: int | float | str,
 ) -> np.ndarray:
     """
-    Generate randomly `m x n`-dimension points with radius `radius` and centered around 0.
+    Generate uniformly at random `m x n`-dimension points in the `norm`-norm ball with radius `radius` and centered
+    around 0.
 
     :param nb_points: Number of random data points.
     :param nb_dims: Dimensionality of the sphere.
@@ -542,13 +585,11 @@ def random_sphere(
                 "The parameter `radius` of type `np.ndarray` is not supported to use with norm 1."
             )
 
-        a_tmp = np.zeros(shape=(nb_points, nb_dims + 1))
-        a_tmp[:, -1] = np.sqrt(np.random.uniform(0, radius ** 2, nb_points))
-
-        for i in range(nb_points):
-            a_tmp[i, 1:-1] = np.sort(np.random.uniform(0, a_tmp[i, -1], nb_dims - 1))
-
-        res = (a_tmp[:, 1:] - a_tmp[:, :-1]) * np.random.choice([-1, 1], (nb_points, nb_dims))
+        var_u = np.random.uniform(size=(nb_points, nb_dims))
+        var_v = np.sort(var_u)
+        v_pre = np.concatenate((np.zeros((nb_points, 1)), var_v[:, : nb_dims - 1]), axis=-1)
+        x = var_v - v_pre
+        res = radius * x * np.random.choice([-1, 1], (nb_points, nb_dims))
 
     elif norm == 2:
         if isinstance(radius, np.ndarray):
@@ -557,7 +598,7 @@ def random_sphere(
             )
 
         a_tmp = np.random.randn(nb_points, nb_dims)
-        s_2 = np.sum(a_tmp ** 2, axis=1)
+        s_2 = np.sum(a_tmp**2, axis=1)
         base = gammainc(nb_dims / 2.0, s_2 / 2.0) ** (1 / nb_dims) * radius / np.sqrt(s_2)
         res = a_tmp * (np.tile(base, (nb_dims, 1))).T
 
@@ -573,10 +614,82 @@ def random_sphere(
     return res
 
 
+def uniform_sample_from_sphere_or_ball(
+    nb_points: int,
+    nb_dims: int,
+    radius: int | float | np.ndarray,
+    sample_space: str = "ball",
+    norm: int | float | str = 2,
+) -> np.ndarray:
+    """
+    Generate a sample of  <nb_points>  distributed independently and uniformly on the sphere (with respect to the given
+    norm) in dimension <nb_dims> with radius <radius> and centered at the origin.  Note that the sphere is the boundary
+    of the ball, i.e., every point on the sphere has the same distance to the origin.
+
+    :param nb_points: Number of random data points
+    :param nb_dims: Dimensionality of the sphere
+    :param radius: Radius of the sphere
+    :param sample_space: One of 'b', 's', 'sphere', 'ball'
+    :param norm: Current support: 1, 2, np.inf, "inf"
+    :return: The sampled points from the sphere (i.e., boundary of the ball)
+    """
+    assert sample_space in ["b", "s", "sphere", "ball"]
+
+    if norm == 1:
+        if sample_space in ["s", "sphere"]:
+            y = np.random.exponential(1, (nb_points, nb_dims))
+            sums = np.sum(y, axis=1)
+            scal = np.outer(sums, np.ones(nb_dims))
+            y = y / scal
+        else:
+            y = np.random.exponential(1, (nb_points, nb_dims + 1))
+            sums = np.sum(y, axis=1)
+            scal = np.outer(sums, np.ones(nb_dims + 1))
+            y = y / scal
+            y = y[:, :nb_dims]
+
+        y = y * np.random.choice([-1, 1], (nb_points, nb_dims))
+        if type(radius) in [int, float]:
+            res = y * radius
+        else:
+            radii = np.outer(radius, np.ones(nb_dims))
+            res = y * radii
+
+    elif norm == 2:
+        x = np.random.normal(0.0, 1.0, (nb_points, nb_dims))
+        scal = radius / np.sqrt(np.sum(x * x, axis=1))
+        scal = np.transpose(np.array(list(scal) * nb_dims).reshape((nb_dims, nb_points)))
+        res = x * scal
+        if sample_space in ["b", "ball"]:
+            rnd = np.random.rand(nb_points)
+            scal = np.float_power(rnd, 1 / nb_dims)
+            scal = np.outer(scal, np.ones(nb_dims))
+            res = res * scal
+
+    elif norm in [np.inf, "inf"]:
+        if sample_space in ["b", "ball"]:
+            x = np.random.uniform(-1.0, 1.0, (nb_points, nb_dims))
+        else:
+            x = np.random.uniform(0, 1.0, (nb_points, nb_dims))
+            rnd = np.random.random((nb_points, nb_dims))
+            maxes = np.max(rnd, axis=1)
+            maxes = np.outer(maxes, np.ones(nb_dims))
+            x = np.maximum((rnd >= maxes), x) * np.random.choice([-1, 1], (nb_points, nb_dims))
+        if type(radius) in [int, float]:
+            res = x * radius
+        else:
+            radii = np.outer(radius, np.ones(nb_dims))
+            res = x * radii
+    else:
+        raise NotImplementedError(f"Norm {norm} not supported")
+
+    return res
+
+
 def original_to_tanh(
     x_original: np.ndarray,
-    clip_min: Union[float, np.ndarray],
-    clip_max: Union[float, np.ndarray],
+    clip_min: float | np.ndarray,
+    clip_max: float | np.ndarray,
     tanh_smoother: float = 0.999999,
 ) -> np.ndarray:
     """
@@ -596,8 +709,8 @@ def original_to_tanh(
 
 def tanh_to_original(
     x_tanh: np.ndarray,
-    clip_min: Union[float, np.ndarray],
-    clip_max: Union[float, np.ndarray],
+    clip_min: float | np.ndarray,
+    clip_max: float | np.ndarray,
 ) -> np.ndarray:
     """
     Transform input from tanh to original space.
@@ -613,7 +726,7 @@ def tanh_to_original(
 # --------------------------------------------------------------------------------------------------- LABELS OPERATIONS
 
 
-def to_categorical(labels: Union[np.ndarray, List[float]], nb_classes: Optional[int] = None) -> np.ndarray:
+def to_categorical(labels: Union[np.ndarray, list[float]], nb_classes: int | None = None) -> np.ndarray:
     """
     Convert an array of labels to binary class matrix.
 
@@ -621,6 +734,10 @@ def to_categorical(labels: Union[np.ndarray, List[float]], nb_classes: Optional[
     :param nb_classes: The number of classes (possible labels).
     :return: A binary matrix representation of `y` in the shape `(nb_samples, nb_classes)`.
     """
+    if hasattr(labels, "detach"):
+        labels = labels.detach().cpu().numpy()
+    elif hasattr(labels, "numpy"):
+        labels = labels.numpy()
     labels = np.array(labels, dtype=int)
     if nb_classes is None:
         nb_classes = np.max(labels) + 1
@@ -629,15 +746,19 @@ def to_categorical(labels: Union[np.ndarray, List[float]], nb_classes: Optional[
     return categorical
 
 
-def float_to_categorical(labels: np.ndarray, nb_classes: Optional[int] = None):
+def float_to_categorical(labels: np.ndarray, nb_classes: int | None = None):
     """
     Convert an array of floating point labels to binary class matrix.
 
-    :param labels: An array of integer labels of shape `(nb_samples,)`
+    :param labels: An array of floating point labels of shape `(nb_samples,)`
     :param nb_classes: The number of classes (possible labels)
     :return: A binary matrix representation of `labels` in the shape `(nb_samples, nb_classes)`
     :rtype: `np.ndarray`
     """
+    if hasattr(labels, "detach"):
+        labels = labels.detach().cpu().numpy()
+    elif hasattr(labels, "numpy"):
+        labels = labels.numpy()
     labels = np.array(labels)
     unique = np.unique(labels)
     unique.sort()
@@ -657,8 +778,12 @@ def floats_to_one_hot(labels: np.ndarray):
     :return: A binary matrix representation of `labels` in the shape `(nb_samples, nb_classes)`
     :rtype: `np.ndarray`
     """
+    if hasattr(labels, "detach"):
+        labels = labels.detach().cpu().numpy()
+    elif hasattr(labels, "numpy"):
+        labels = labels.numpy()
     labels = np.array(labels)
-    for feature in labels.T:  # pylint: disable=E1133
+    for feature in labels.T:
         unique = np.unique(feature)
         unique.sort()
         for index, value in enumerate(unique):
@@ -667,34 +792,46 @@ def floats_to_one_hot(labels: np.ndarray):
 
 
 def check_and_transform_label_format(
-    labels: np.ndarray, nb_classes: Optional[int] = None, return_one_hot: bool = True
+    labels: np.ndarray, nb_classes: int | None, return_one_hot: bool = True
 ) -> np.ndarray:
     """
-    Check label format and transform to one-hot-encoded labels if necessary
+    Check label format and transform to one-hot-encoded labels if necessary. Only supports single-output classification.
 
     :param labels: An array of integer labels of shape `(nb_samples,)`, `(nb_samples, 1)` or `(nb_samples, nb_classes)`.
-    :param nb_classes: The number of classes.
+    :param nb_classes: The number of classes, as an integer. If None the number of classes is determined automatically.
     :param return_one_hot: True if returning one-hot encoded labels, False if returning index labels.
     :return: Labels with shape `(nb_samples, nb_classes)` (one-hot) or `(nb_samples,)` (index).
     """
+    if hasattr(labels, "detach"):
+        labels = labels.detach().cpu().numpy()
+    elif hasattr(labels, "numpy"):
+        labels = labels.numpy()
     labels_return = labels
+
+    if nb_classes is not None and not isinstance(nb_classes, (int, np.integer)):
+        raise TypeError("nb_classes that is not an integer is not supported")
 
     if len(labels.shape) == 2 and labels.shape[1] > 1:  # multi-class, one-hot encoded
         if not return_one_hot:
             labels_return = np.argmax(labels, axis=1)
             labels_return = np.expand_dims(labels_return, axis=1)
-    elif (
-        len(labels.shape) == 2 and labels.shape[1] == 1 and nb_classes is not None and nb_classes > 2
-    ):  # multi-class, index labels
-        if return_one_hot:
-            labels_return = to_categorical(labels, nb_classes)
+    elif len(labels.shape) == 2 and labels.shape[1] == 1:
+        if nb_classes is None:
+            nb_classes = int(np.max(labels) + 1)
+        if nb_classes > 2:  # multi-class, index labels
+            if return_one_hot:
+                labels_return = to_categorical(labels, nb_classes)
+            else:
+                labels_return = np.expand_dims(labels, axis=1)
+        elif nb_classes == 2:  # binary, index labels
+            if return_one_hot:
+                labels_return = to_categorical(labels, nb_classes)
         else:
-            labels_return = np.expand_dims(labels, axis=1)
-    elif (
-        len(labels.shape) == 2 and labels.shape[1] == 1 and nb_classes is not None and nb_classes == 2
-    ):  # binary, index labels
-        if return_one_hot:
-            labels_return = to_categorical(labels, nb_classes)
+            raise ValueError(
+                "Shape of labels not recognised."
+                "Please provide labels in shape (nb_samples,) or (nb_samples, "
+                "nb_classes)"
+            )
     elif len(labels.shape) == 1:  # index labels
         if return_one_hot:
             labels_return = to_categorical(labels, nb_classes)
@@ -702,7 +839,9 @@ def check_and_transform_label_format(
             labels_return = np.expand_dims(labels, axis=1)
     else:
         raise ValueError(
-            "Shape of labels not recognised." "Please provide labels in shape (nb_samples,) or (nb_samples, nb_classes)"
+            "Shape of labels not recognised."
+            "Please provide labels in shape (nb_samples,) or (nb_samples, "
+            "nb_classes)"
         )
 
     return labels_return
@@ -760,7 +899,7 @@ def second_most_likely_class(x: np.ndarray, classifier: "CLASSIFIER_TYPE") -> np
     )
 
 
-def get_label_conf(y_vec: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+def get_label_conf(y_vec: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """
     Returns the confidence and the label of the most probable class given a vector of class confidences
 
@@ -775,7 +914,7 @@ def get_label_conf(y_vec: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
 
 def get_labels_np_array(preds: np.ndarray) -> np.ndarray:
     """
-    Returns the label of the most probable class given a array of class confidences.
+    Returns the label of the most probable class given an array of class confidences.
 
     :param preds: Array of class confidences, nb of instances as first dimension.
     :return: Labels.
@@ -800,25 +939,19 @@ def get_feature_values(x: np.ndarray, single_index_feature: bool) -> list:
              For a multi-column feature, a list of lists, where each internal list represents a column and the values
              represent the possible values for that column (in increasing order).
     """
-    values = None
+    values = []
     if single_index_feature:
         values = np.unique(x).tolist()
     else:
         for column in x.T:
-            column_values = np.unique(column)
-            if values is None:
-                values = column_values
-            else:
-                values = np.vstack((values, column_values))
-        if values is not None:
-            values = values.tolist()
+            values.append(np.unique(column).tolist())
     return values
 
 
-def get_feature_index(feature: Union[int, slice]) -> Union[int, slice]:
+def get_feature_index(feature: int | slice) -> int | slice:
     """
-    Returns a modified feature index: in case of a slice of size 1, returns the corresponding integer. Otherwise,
-    returns the same value (integer or slice) as passed.
+    Returns a modified feature index: in case of a slice of size 1, returns the corresponding integer. In case
+    of a slice with missing params, tries to fill them. Otherwise, returns the same value (integer or slice) as passed.
 
     :param feature: The index or slice representing a feature to attack
     :return: An integer representing a single column index or a slice representing a multi-column index
@@ -833,10 +966,24 @@ def get_feature_index(feature: Union[int, slice]) -> Union[int, slice]:
         start = 0
     if step is None:
         step = 1
-    if feature.stop is not None and ((stop - start) // step) == 1:
+    if stop is not None and ((stop - start) // step) == 1:
         return start
 
-    return feature
+    return slice(start, stop, step)
+
+
+def remove_attacked_feature(attack_feature: int | slice, non_numerical_features: list[int] | None):
+    """
+    Removes the attacked feature from the list of non-numeric features to encode.
+
+    :param attack_feature: The index or slice representing a feature to attack
+    :param non_numerical_features: a list of feature indexes that require encoding in order to feed into an ML model
+                                    (i.e., strings)
+    :return:
+    """
+    if non_numerical_features is not None and isinstance(attack_feature, int):
+        if attack_feature in non_numerical_features:
+            non_numerical_features.remove(attack_feature)
 
 
 def compute_success_array(
@@ -846,7 +993,7 @@ def compute_success_array(
     x_adv: np.ndarray,
     targeted: bool = False,
     batch_size: int = 1,
-) -> float:
+) -> np.ndarray:
     """
     Compute the success rate of an attack based on clean samples, adversarial samples and targets or correct labels.
 
@@ -901,7 +1048,7 @@ def compute_success(
     return np.sum(attack_success) / x_adv.shape[0]
 
 
-def compute_accuracy(preds: np.ndarray, labels: np.ndarray, abstain: bool = True) -> Tuple[float, float]:
+def compute_accuracy(preds: np.ndarray, labels: np.ndarray, abstain: bool = True) -> tuple[float, float]:
     """
     Compute the accuracy rate and coverage rate of predictions
     In the case where predictions are abstained, those samples are ignored.
@@ -925,6 +1072,115 @@ def compute_accuracy(preds: np.ndarray, labels: np.ndarray, abstain: bool = True
     return acc_rate, coverage_rate
 
 
+def intersection_over_union(bbox_1: np.ndarray, bbox_2: np.ndarray) -> float:
+    """
+    Compute the intersection over union (IoU) of two bounding boxes.
+    Both bounding boxes are expected to be in torchvision format [x1, y1, x2, y2].
+
+    param bbox_1: Bounding box 1 in torchvision format [x1, y1, x2, y2].
+    param bbox_2: Bounding box 2 in torchvision format [x1, y2, x2, y2].
+    return: The intersection over union (IoU) of the two bounding boxes.
+    """
+    # Calculate area of the intersection
+    x_1 = max(bbox_1[0], bbox_2[0])
+    y_1 = max(bbox_1[1], bbox_2[1])
+    x_2 = min(bbox_1[2], bbox_2[2])
+    y_2 = min(bbox_1[3], bbox_2[3])
+    intersection = max(0, x_2 - x_1 + 1) * max(0, y_2 - y_1 + 1)
+
+    # Calculate the area of the union
+    bbox_1_area = (bbox_1[2] - bbox_1[0] + 1) * (bbox_1[3] - bbox_1[1] + 1)
+    bbox_2_area = (bbox_2[2] - bbox_2[0] + 1) * (bbox_2[3] - bbox_2[1] + 1)
+    union = bbox_1_area + bbox_2_area - intersection
+
+    return intersection / union
+
+
+def intersection_over_area(bbox_1: np.ndarray, bbox_2: np.ndarray) -> float:
+    """
+    Compute the intersection over area (IoA) of two bounding boxes.
+    Both bounding boxes are expected to be in torchvision format [x1, y1, x2, y2].
+
+    param bbox_1: Bounding box 1 in torchvision format [x1, y1, x2, y2].
+    param bbox_2: Bounding box 2 in torchvision format [x1, y2, x2, y2].
+    return: The intersection over area (IoA) of the two bounding boxes.
+    """
+    # Calculate area of the intersection
+    x_1 = max(bbox_1[0], bbox_2[0])
+    y_1 = max(bbox_1[1], bbox_2[1])
+    x_2 = min(bbox_1[2], bbox_2[2])
+    y_2 = min(bbox_1[3], bbox_2[3])
+    intersection = max(0, x_2 - x_1 + 1) * max(0, y_2 - y_1 + 1)
+
+    # Calculate the area of bbox_1
+    bbox_1_area = (bbox_1[2] - bbox_1[0] + 1) * (bbox_1[3] - bbox_1[1] + 1)
+
+    return intersection / bbox_1_area
+
+
+def non_maximum_suppression(
+    preds: dict[str, np.ndarray], iou_threshold: float, confidence_threshold: float | None = None
+) -> dict[str, np.ndarray]:
+    """
+    Perform non-maximum suppression on the predicted object detection labels of a single image.
+
+    :param preds: Predicted labels of format `dict[str, np.ndarray]` for a single image. The fields of the dict are
+                  as follows:
+
+                  - boxes [N, 4]: the boxes in [x1, y1, x2, y2] format, with 0 <= x1 < x2 <= W and 0 <= y1 < y2 <= H.
+                  - labels [N]: the labels for each image.
+                  - scores [N]: the scores of each prediction.
+    :param iou_threshold: The IoU threshold to discard overlapping bounding boxes.
+    :param confidence_threshold: The confidence threshold to discard bounding boxes.
+    return: Filtered predicted labels of the single image in the same format as the input.
+    """
+    boxes = preds["boxes"]
+    labels = preds["labels"]
+    scores = preds["scores"]
+
+    # Filter out bounding boxes below confidence threshold
+    if confidence_threshold is not None:
+        mask = scores >= confidence_threshold
+        boxes = boxes[mask]
+        labels = labels[mask]
+        scores = scores[mask]
+
+    # Candidate bounding boxes
+    keep_indices = []
+    indices = np.argsort(scores)[::-1]
+
+    while len(indices) > 0:
+        # Get first bounding box
+        current_idx = indices[0]
+        box_1 = boxes[current_idx]
+        label_1 = labels[current_idx]
+
+        keep_indices.append(current_idx)
+        remove_indices = [0]
+
+        # Find overlapping bounding boxes above IoU threshold
+        for i, idx in enumerate(indices[1:], start=1):
+            box_2 = boxes[idx]
+            label_2 = labels[idx]
+
+            if label_1 != label_2:
+                continue
+
+            iou = intersection_over_union(box_1, box_2)
+            if iou >= iou_threshold:
+                remove_indices.append(i)
+
+        # Remove overlapping bounding boxes from candidates
+        indices = np.delete(indices, remove_indices)
+
+    filtered_preds = {
+        "boxes": boxes[keep_indices],
+        "labels": labels[keep_indices],
+        "scores": scores[keep_indices],
+    }
+    return filtered_preds
+
+
 # -------------------------------------------------------------------------------------------------- DATASET OPERATIONS
 
 
@@ -938,7 +1194,7 @@ def load_cifar10(
     :return: `(x_train, y_train), (x_test, y_test), min, max`
     """
 
-    def load_batch(fpath: str) -> Tuple[np.ndarray, np.ndarray]:
+    def load_batch(fpath: str) -> tuple[np.ndarray, np.ndarray]:
         """
         Utility function for loading CIFAR batches, as written in Keras.
 
@@ -980,8 +1236,6 @@ def load_cifar10(
 
     fpath = os.path.join(path, "test_batch")
     x_test, y_test = load_batch(fpath)
-    y_train = np.reshape(y_train, (len(y_train), 1))
-    y_test = np.reshape(y_test, (len(y_test), 1))
 
     # Set channels last
     x_train = x_train.transpose((0, 2, 3, 1))
@@ -1060,12 +1314,12 @@ def load_stl() -> DATASET_TYPE:
     x_test = x_test.transpose((0, 2, 3, 1))
 
     with open(os.path.join(path, "train_y.bin"), "rb") as f_numpy:
-        y_train = np.fromfile(f_numpy, dtype=np.uint8)
-        y_train -= 1
+        y_train_uint = np.fromfile(f_numpy, dtype=np.uint8)
+        y_train = y_train_uint - 1
 
     with open(os.path.join(path, "test_y.bin"), "rb") as f_numpy:
-        y_test = np.fromfile(f_numpy, dtype=np.uint8)
-        y_test -= 1
+        y_test_uint = np.fromfile(f_numpy, dtype=np.uint8)
+        y_test = y_test_uint - 1
 
     x_train, y_train = preprocess(x_train, y_train)
     x_test, y_test = preprocess(x_test, y_test)
@@ -1188,7 +1442,9 @@ def load_nursery(
         "nursery.data",
         path=config.ART_DATA_PATH,
         extract=False,
-        url="https://archive.ics.uci.edu/ml/machine-learning-databases/nursery/nursery.data",
+        url=[
+            "https://www.dropbox.com/s/l24hwvkuueor6lp/nursery.data?dl=1",
+        ],
     )
 
     # load data
@@ -1312,13 +1568,16 @@ def _extract(full_path: str, path: str) -> bool:
             archive = tarfile.open(full_path, "r:gz")
     elif full_path.endswith("zip"):  # pragma: no cover
         if zipfile.is_zipfile(full_path):
-            archive = zipfile.ZipFile(full_path)  # pylint: disable=R1732
+            archive = zipfile.ZipFile(full_path)  # pylint: disable=consider-using-with
         else:
             return False
     else:
         return False
 
     try:
+        for entry in archive.getmembers():  # type: ignore
+            if os.path.isabs(entry.name) or ".." in entry.name:
+                raise ValueError(f"Illegal tar archive entry: {entry.name}")
         archive.extractall(path)
     except (tarfile.TarError, RuntimeError, KeyboardInterrupt):  # pragma: no cover
         if os.path.exists(path):
@@ -1330,7 +1589,9 @@ def _extract(full_path: str, path: str) -> bool:
     return True
 
 
-def get_file(filename: str, url: str, path: Optional[str] = None, extract: bool = False, verbose: bool = False) -> str:
+def get_file(
+    filename: str, url: Union[str, list[str]], path: str | None = None, extract: bool = False, verbose: bool = False
+) -> str:
     """
     Downloads a file from a URL if it not already in the cache. The file at indicated by `url` is downloaded to the
     path `path` (default is ~/.art/data). and given the name `filename`. Files in tar, tar.gz, tar.bz, and zip formats
@@ -1343,6 +1604,11 @@ def get_file(filename: str, url: str, path: Optional[str] = None, extract: bool 
     :param verbose: If true, print download progress bar.
     :return: Path to the downloaded file.
     """
+    if isinstance(url, str):
+        url_list = [url]
+    else:
+        url_list = url
+
     if path is None:
         path_ = os.path.expanduser(config.ART_DATA_PATH)
     else:
@@ -1353,62 +1619,72 @@ def get_file(filename: str, url: str, path: Optional[str] = None, extract: bool 
     if not os.path.exists(path_):
         os.makedirs(path_)
 
+    target_path = os.path.join(path_, filename)
+
     if extract:
-        extract_path = os.path.join(path_, filename)
-        full_path = extract_path + ".tar.gz"
+        full_path = target_path + ".tar.gz"
     else:
-        full_path = os.path.join(path_, filename)
+        full_path = target_path
 
     # Determine if dataset needs downloading
-    download = not os.path.exists(full_path)
+    download = not os.path.exists(target_path)
 
     if download:
         logger.info("Downloading data from %s", url)
-        error_msg = "URL fetch failure on {}: {} -- {}"
         try:
-            try:
-                from six.moves.urllib.error import HTTPError, URLError
-                from six.moves.urllib.request import urlretrieve
+            for url_i in url_list:
+                try:
+                    import ssl
+                    from six.moves.urllib.error import HTTPError, URLError
+                    from six.moves.urllib.request import urlopen
 
-                # The following two lines should prevent occasionally occurring
-                # [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed (_ssl.c:847)
-                import ssl
+                    try:
+                        context = ssl.create_default_context()
+                    except Exception:  # pragma: no cover
+                        context = None
 
-                ssl._create_default_https_context = ssl._create_unverified_context  # pylint: disable=W0212
+                    try:
+                        response = urlopen(url_i, context=context)
+                    except (ssl.SSLError, URLError):
+                        if hasattr(ssl, "_create_unverified_context"):
+                            context = ssl._create_unverified_context()
+                            response = urlopen(url_i, context=context)
+                        else:
+                            raise
 
-                if verbose:
-                    with tqdm() as t_bar:
-                        last_block = [0]
+                    total_size_str = response.headers.get("Content-Length")
+                    total_size = int(total_size_str) if total_size_str is not None else None
+                    block_size = 1024 * 8
 
-                        def progress_bar(blocks: int = 1, block_size: int = 1, total_size: Optional[int] = None):
-                            """
-                            :param blocks: Number of blocks transferred so far [default: 1].
-                            :param block_size: Size of each block (in tqdm units) [default: 1].
-                            :param total_size: Total size (in tqdm units). If [default: None] or -1, remains unchanged.
-                            """
-                            if total_size not in (None, -1):
-                                t_bar.total = total_size
-                            displayed = t_bar.update((blocks - last_block[0]) * block_size)
-                            last_block[0] = blocks
-                            return displayed
+                    with open(full_path, "wb") as f_out:
+                        if verbose:
+                            with tqdm(total=total_size, unit="B", unit_scale=True, unit_divisor=1024) as t_bar:
+                                while True:
+                                    chunk = response.read(block_size)
+                                    if not chunk:
+                                        break
+                                    f_out.write(chunk)
+                                    t_bar.update(len(chunk))
+                        else:
+                            while True:
+                                chunk = response.read(block_size)
+                                if not chunk:
+                                    break
+                                f_out.write(chunk)
 
-                        urlretrieve(url, full_path, reporthook=progress_bar)
-                else:
-                    urlretrieve(url, full_path)
-
-            except HTTPError as exception:  # pragma: no cover
-                raise Exception(error_msg.format(url, exception.code, exception.msg)) from HTTPError  # type: ignore
-            except URLError as exception:  # pragma: no cover
-                raise Exception(error_msg.format(url, exception.errno, exception.reason)) from HTTPError  # type: ignore
+                except HTTPError as exception:  # pragma: no cover
+                    logger.error(url_i, exception)
+                except URLError as exception:  # pragma: no cover
+                    logger.error(url_i, exception)
         except (Exception, KeyboardInterrupt):  # pragma: no cover
             if os.path.exists(full_path):
                 os.remove(full_path)
             raise
 
     if extract:
-        if not os.path.exists(extract_path):
+        if not os.path.exists(target_path):
             _extract(full_path, path_)
-        return extract_path
+        return target_path
 
     return full_path
 
@@ -1423,7 +1699,7 @@ def make_directory(dir_path: str) -> None:
         os.makedirs(dir_path)
 
 
-def clip_and_round(x: np.ndarray, clip_values: Optional["CLIP_VALUES_TYPE"], round_samples: float) -> np.ndarray:
+def clip_and_round(x: np.ndarray, clip_values: "CLIP_VALUES_TYPE" | None, round_samples: float) -> np.ndarray:
     """
     Rounds the input to the correct level of granularity.
     Useful to ensure data passed to classifier can be represented
@@ -1448,8 +1724,8 @@ def preprocess(
     x: np.ndarray,
     y: np.ndarray,
     nb_classes: int = 10,
-    clip_values: Optional["CLIP_VALUES_TYPE"] = None,
-) -> Tuple[np.ndarray, np.ndarray]:
+    clip_values: "CLIP_VALUES_TYPE" | None = None,
+) -> tuple[np.ndarray, np.ndarray]:
     """
     Scales `x` to [0, 1] and converts `y` to class categorical confidences.
 
@@ -1471,7 +1747,7 @@ def preprocess(
     return normalized_x, categorical_y
 
 
-def segment_by_class(data: Union[np.ndarray, List[int]], classes: np.ndarray, num_classes: int) -> List[np.ndarray]:
+def segment_by_class(data: Union[np.ndarray, list[int]], classes: np.ndarray, num_classes: int) -> list[np.ndarray]:
     """
     Returns segmented data according to specified features.
 
@@ -1481,7 +1757,7 @@ def segment_by_class(data: Union[np.ndarray, List[int]], classes: np.ndarray, nu
     :param num_classes: How many features.
     :return: Segmented data according to specified features.
     """
-    by_class: List[List[int]] = [[] for _ in range(num_classes)]
+    by_class: list[list[int]] = [[] for _ in range(num_classes)]
     for indx, feature in enumerate(classes):
         if len(classes.shape) == 2 and classes.shape[1] > 1:
             assigned = int(np.argmax(feature))
@@ -1512,7 +1788,7 @@ def performance_diff(
     :param perf_function: The performance metric to be used. One of ['accuracy', 'f1'] or a callable function
            `(true_labels, model_labels[, kwargs]) -> float`.
     :param kwargs: Arguments to add to performance function.
-    :return: The difference in performance performance(model1) - performance(model2).
+    :return: The difference in performance: performance(model1) - performance(model2).
     :raises `ValueError`: If an unsupported performance function is requested.
     """
     from sklearn.metrics import accuracy_score, f1_score
@@ -1553,7 +1829,25 @@ def is_probability(vector: np.ndarray) -> bool:
     return is_sum_1 and is_smaller_1 and is_larger_0
 
 
-def pad_sequence_input(x: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+def is_probability_array(array: np.ndarray) -> bool:
+    """
+    Check if a multidimensional array is an array of probabilities.
+
+    :param array: A numpy array.
+    :return: True if it is an array of probabilities.
+    """
+    if len(array.shape) == 1:
+        return is_probability(array)
+    sum_array = np.sum(array, axis=1)
+    ones = np.ones_like(sum_array)
+    is_sum_1 = np.allclose(sum_array, ones, rtol=1e-03)
+    is_smaller_1 = np.amax(array) <= 1.0
+    is_larger_0 = np.amin(array) >= 0.0
+
+    return is_sum_1 and is_smaller_1 and is_larger_0
+
+
+def pad_sequence_input(x: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """
     Apply padding to a batch of 1-dimensional samples such that it has shape of (batch_size, max_length).
 

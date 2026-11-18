@@ -18,9 +18,12 @@
 """
 This module defines a base class for EoT in TensorFlow v2.
 """
+
+from __future__ import annotations
+
 from abc import abstractmethod
 import logging
-from typing import Dict, List, Optional, Tuple, TYPE_CHECKING, Union
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -40,7 +43,7 @@ class EoTTensorFlowV2(PreprocessorTensorFlowV2):
     def __init__(
         self,
         nb_samples: int,
-        clip_values: Tuple[float, float],
+        clip_values: tuple[float, float],
         apply_fit: bool = False,
         apply_predict: bool = True,
     ) -> None:
@@ -59,9 +62,7 @@ class EoTTensorFlowV2(PreprocessorTensorFlowV2):
         EoTTensorFlowV2._check_params(self)
 
     @abstractmethod
-    def _transform(
-        self, x: "tf.Tensor", y: Optional["tf.Tensor"], **kwargs
-    ) -> Tuple["tf.Tensor", Optional["tf.Tensor"]]:
+    def _transform(self, x: "tf.Tensor", y: "tf.Tensor" | None, **kwargs) -> tuple["tf.Tensor", "tf.Tensor" | None]:
         """
         Internal method implementing the transformation per input sample.
 
@@ -71,7 +72,7 @@ class EoTTensorFlowV2(PreprocessorTensorFlowV2):
         """
         raise NotImplementedError
 
-    def forward(self, x: "tf.Tensor", y: Optional["tf.Tensor"] = None) -> Tuple["tf.Tensor", Optional["tf.Tensor"]]:
+    def forward(self, x: "tf.Tensor", y: "tf.Tensor" | None = None) -> tuple["tf.Tensor", "tf.Tensor" | None]:
         """
         Apply transformations to inputs `x` and labels `y`.
 
@@ -79,7 +80,7 @@ class EoTTensorFlowV2(PreprocessorTensorFlowV2):
         :param y: Label of the sample `x`. This function does not modify `y`.
         :return: Corrupted samples and labels.
         """
-        import tensorflow as tf  # lgtm [py/repeated-import]
+        import tensorflow as tf
 
         x_preprocess_list = []
         y_preprocess_list = []
@@ -87,7 +88,7 @@ class EoTTensorFlowV2(PreprocessorTensorFlowV2):
         for i_image in range(x.shape[0]):
             for _ in range(self.nb_samples):
                 x_i = x[[i_image]]
-                y_i: Optional[Union[tf.Tensor, List[Dict[str, tf.Tensor]]]]
+                y_i: tf.Tensor | list[dict[str, tf.Tensor]] | None
                 if y is not None:
                     if isinstance(y, list):
                         y_i = [y[i_image]]

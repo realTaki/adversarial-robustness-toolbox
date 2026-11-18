@@ -18,13 +18,16 @@
 """
 This module implements robustness verifications for decision-tree-based models.
 """
-from __future__ import absolute_import, division, print_function, unicode_literals
+
+from __future__ import absolute_import, division, print_function, unicode_literals, annotations
 
 import logging
-from typing import Dict, List, Optional, Tuple, Union, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 import numpy as np
 from tqdm.auto import trange
+
+from art.utils import check_and_transform_label_format
 
 if TYPE_CHECKING:
     from art.estimators.classification.classifier import ClassifierDecisionTree
@@ -53,7 +56,7 @@ class Box:
     Representation of a box of intervals bounds.
     """
 
-    def __init__(self, intervals: Optional[Dict[int, Interval]] = None) -> None:
+    def __init__(self, intervals: dict[int, Interval] | None = None) -> None:
         """
         A box of intervals.
 
@@ -117,9 +120,9 @@ class LeafNode:
 
     def __init__(
         self,
-        tree_id: Optional[int],
+        tree_id: int | None,
         class_label: int,
-        node_id: Optional[int],
+        node_id: int | None,
         box: Box,
         value: float,
     ) -> None:
@@ -148,7 +151,7 @@ class Tree:
     Representation of a decision tree.
     """
 
-    def __init__(self, class_id: Optional[int], leaf_nodes: List[LeafNode]) -> None:
+    def __init__(self, class_id: int | None, leaf_nodes: list[LeafNode]) -> None:
         """
         Create a decision tree representation.
 
@@ -187,12 +190,13 @@ class RobustnessVerificationTreeModelsCliqueMethod:
         nb_search_steps: int = 10,
         max_clique: int = 2,
         max_level: int = 2,
-    ) -> Tuple[float, float]:
+    ) -> tuple[float, float]:
         """
         Verify the robustness of the classifier on the dataset `(x, y)`.
 
         :param x: Feature data of shape `(nb_samples, nb_features)`.
-        :param y: Labels, one-vs-rest encoding of shape `(nb_samples, nb_classes)`.
+        :param y: Labels, one-hot-encoded of shape `(nb_samples, nb_classes)` or indices of shape
+                  (nb_samples,)`.
         :param eps_init: Attack budget for the first search step.
         :param norm: The norm to apply epsilon.
         :param nb_search_steps: The number of search steps.
@@ -200,8 +204,16 @@ class RobustnessVerificationTreeModelsCliqueMethod:
         :param max_level: The maximum number of clique search levels.
         :return: A tuple of the average robustness bound and the verification error at `eps`.
         """
+        if np.min(x) < 0 or np.max(x) > 1:
+            raise ValueError(
+                "There are features not in the range [0, 1]. The current implementation only supports normalized input"
+                "values in range [0 1]."
+            )
+
         self.x: np.ndarray = x
-        self.y: np.ndarray = np.argmax(y, axis=1)
+        self.y: np.ndarray = check_and_transform_label_format(
+            y, nb_classes=self._classifier.nb_classes, return_one_hot=False
+        )
         self.max_clique: int = max_clique
         self.max_level: int = max_level
 
@@ -209,17 +221,17 @@ class RobustnessVerificationTreeModelsCliqueMethod:
         num_initial_successes: int = 0
         num_samples: int = x.shape[0]
 
-        # pylint: disable=R1702
+        # pylint: disable=too-many-nested-blocks
         pbar = trange(num_samples, desc="Decision tree verification", disable=not self.verbose)
         for i_sample in pbar:
 
             eps: float = eps_init
-            robust_log: List[bool] = []
+            robust_log: list[bool] = []
             i_robust = None
             i_not_robust = None
             eps_robust: float = 0.0
             eps_not_robust: float = 0.0
-            best_score: Optional[float]
+            best_score: float | None
 
             for i_step in range(nb_search_steps):
                 logger.info("Search step %d: eps = %.4g", i_step, eps)
@@ -282,14 +294,14 @@ class RobustnessVerificationTreeModelsCliqueMethod:
 
     def _get_k_partite_clique(
         self,
-        accessible_leaves: List[List[LeafNode]],
+        accessible_leaves: list[list[LeafNode]],
         label: int,
-        target_label: Optional[int],
-    ) -> Tuple[float, List]:
+        target_label: int | None,
+    ) -> tuple[float, list]:
         """
         Find the K partite cliques among the accessible leaf nodes.
 
-        :param accessible_leaves: List of lists of accessible leaf nodes.
+        :param accessible_leaves: list of lists of accessible leaf nodes.
         :param label: The try label of the current sample.
         :param target_label: The target label.
         :return: The best score and a list of new cliques.
@@ -297,10 +309,10 @@ class RobustnessVerificationTreeModelsCliqueMethod:
         new_nodes_list = []
         best_scores_sum = 0.0
 
-        # pylint: disable=R1702
+        # pylint: disable=too-many-nested-blocks
         for start_tree in range(0, len(accessible_leaves), self.max_clique):
-            cliques_old: List[Dict[str, Union[Box, float]]] = []
-            cliques_new: List[Dict[str, Union[Box, float]]] = []
+            cliques_old: list[dict[str, Box | float]] = []
+            cliques_new: list[dict[str, Box | float]] = []
 
             # Start searching for cliques
             for accessible_leaf in accessible_leaves[start_tree]:
@@ -314,7 +326,7 @@ class RobustnessVerificationTreeModelsCliqueMethod:
                     new_leaf_value = accessible_leaf.value
                 cliques_old.append({"box": accessible_leaf.box, "value": new_leaf_value})
 
-            # Loop over all all trees
+            # Loop over all trees
             for i_tree in range(
                 start_tree + 1,
                 min(len(accessible_leaves), start_tree + self.max_clique),
@@ -370,7 +382,7 @@ class RobustnessVerificationTreeModelsCliqueMethod:
 
         return best_scores_sum, new_nodes_list
 
-    def _get_best_score(self, i_sample: int, eps: float, norm: float, target_label: Optional[int]) -> float:
+    def _get_best_score(self, i_sample: int, eps: float, norm: float, target_label: int | None) -> float:
         """
         Get the list of best scores.
 
@@ -433,8 +445,8 @@ class RobustnessVerificationTreeModelsCliqueMethod:
         return resulting_distance
 
     def _get_accessible_leaves(
-        self, i_sample: int, eps: float, norm: float, target_label: Optional[int]
-    ) -> List[List[LeafNode]]:
+        self, i_sample: int, eps: float, norm: float, target_label: int | None
+    ) -> list[list[LeafNode]]:
         """
         Determine the leaf nodes accessible within the attack budget.
 

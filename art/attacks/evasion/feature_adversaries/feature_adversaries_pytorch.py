@@ -20,8 +20,11 @@ This module implements the Feature Adversaries attack in PyTorch.
 
 | Paper link: https://arxiv.org/abs/1511.05122
 """
+
+from __future__ import annotations
+
 import logging
-from typing import TYPE_CHECKING, Optional, Tuple, Union
+from typing import TYPE_CHECKING
 
 import numpy as np
 from tqdm.auto import trange
@@ -30,7 +33,7 @@ from art.attacks.attack import EvasionAttack
 from art.estimators.estimator import BaseEstimator, NeuralNetworkMixin
 
 if TYPE_CHECKING:
-    # pylint: disable=C0412
+
     import torch
     from torch.optim import Optimizer
 
@@ -65,13 +68,13 @@ class FeatureAdversariesPyTorch(EvasionAttack):
         self,
         estimator: "PYTORCH_ESTIMATOR_TYPE",
         delta: float,
-        optimizer: Optional["Optimizer"] = None,
-        optimizer_kwargs: Optional[dict] = None,
+        optimizer: "Optimizer" | None = None,
+        optimizer_kwargs: dict | None = None,
         lambda_: float = 0.0,
-        layer: Union[int, str, Tuple[int, ...], Tuple[str, ...]] = -1,
+        layer: int | str | tuple[int, ...] | tuple[str, ...] = -1,
         max_iter: int = 100,
         batch_size: int = 32,
-        step_size: Optional[Union[int, float]] = None,
+        step_size: int | float | None = None,
         random_start: bool = False,
         verbose: bool = True,
     ):
@@ -113,7 +116,7 @@ class FeatureAdversariesPyTorch(EvasionAttack):
         :param y: Guide samples.
         :return: Batch of adversarial examples.
         """
-        import torch  # lgtm [py/repeated-import]
+        import torch
 
         def loss_fn(source_orig, source_adv, guide):
             representation_loss = torch.zeros(size=(source_orig.shape[0],)).to(self.estimator.device)
@@ -148,7 +151,10 @@ class FeatureAdversariesPyTorch(EvasionAttack):
                 loss.backward()
 
                 # pgd step
-                adv.data = adv - adv.grad.detach().sign() * self.step_size
+                if adv.grad is not None and self.step_size is not None:
+                    adv.data = adv - adv.grad.detach().sign() * self.step_size
+                else:
+                    raise ValueError("Gradient tensor in PyTorch model or step_size is `None`.")
                 perturbation = torch.clamp(adv.detach() - x.detach(), -self.delta, self.delta)
                 adv.data = x.detach() + perturbation
                 if self.estimator.clip_values is not None:
@@ -177,7 +183,7 @@ class FeatureAdversariesPyTorch(EvasionAttack):
                     adv.data = torch.clamp(adv.detach(), *self.estimator.clip_values)
         return adv.detach().cpu()
 
-    def generate(self, x: np.ndarray, y: Optional[np.ndarray] = None, **kwargs) -> np.ndarray:
+    def generate(self, x: np.ndarray, y: np.ndarray | None = None, **kwargs) -> np.ndarray:
         """
         Generate adversarial samples and return them in an array.
 
@@ -185,7 +191,7 @@ class FeatureAdversariesPyTorch(EvasionAttack):
         :param y: Guide samples.
         :return: Adversarial examples.
         """
-        import torch  # lgtm [py/repeated-import]
+        import torch
 
         if y is None:
             raise ValueError("The value of guide `y` cannot be None. Please provide a `np.ndarray` of guide inputs.")
@@ -204,8 +210,8 @@ class FeatureAdversariesPyTorch(EvasionAttack):
             begin, end = m * self.batch_size, min((m + 1) * self.batch_size, nb_samples)
 
             # create batch of adversarial examples
-            source_batch = torch.tensor(x[begin:end])
-            guide_batch = torch.tensor(y[begin:end])
+            source_batch = torch.tensor(x[begin:end]).to(self.estimator.device)
+            guide_batch = torch.tensor(y[begin:end]).to(self.estimator.device)
             x_adversarial[begin:end] = self._generate_batch(source_batch, guide_batch).numpy()
         return np.array(x_adversarial, dtype=x.dtype)
 

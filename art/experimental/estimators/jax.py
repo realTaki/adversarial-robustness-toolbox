@@ -18,12 +18,12 @@
 """
 This module implements the abstract estimator `JaxEstimator` for Jax models.
 """
+
 import logging
 
 import numpy as np
 
 from art.estimators.estimator import BaseEstimator, LossGradientsMixin, NeuralNetworkMixin
-
 
 logger = logging.getLogger(__name__)
 
@@ -88,6 +88,3 @@ class JaxEstimator(NeuralNetworkMixin, LossGradientsMixin, BaseEstimator):
         """
         super().set_params(**kwargs)
         self._check_params()
-
-    def _check_params(self) -> None:
-        super()._check_params()

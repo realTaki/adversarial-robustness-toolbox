@@ -55,11 +55,11 @@ def test_generate(art_warning, fix_get_mnist_subset, image_dl_estimator_for_atta
             verbose=False,
         )
 
-        (x_train_mnist, y_train_mnist, x_test_mnist, y_test_mnist) = fix_get_mnist_subset
+        x_train_mnist, y_train_mnist, x_test_mnist, y_test_mnist = fix_get_mnist_subset
 
         x_train_mnist_adv = attack.generate(x=x_train_mnist[0:1], y=y_train_mnist[0:1])
 
-        assert np.max(np.abs(x_train_mnist_adv - x_train_mnist[0:1])) == pytest.approx(0.38116083, abs=0.06)
+        assert np.max(np.abs(x_train_mnist_adv - x_train_mnist[0:1])) == pytest.approx(0.3803413510322571, abs=0.06)
     except ARTTestException as e:
         art_warning(e)
 
@@ -82,7 +82,7 @@ def test_get_regularisation_loss_gradients(art_warning, fix_get_mnist_subset, im
             verbose=False,
         )
 
-        (x_train_mnist, _, _, _) = fix_get_mnist_subset
+        x_train_mnist, _, _, _ = fix_get_mnist_subset
 
         gradients = attack._get_regularisation_loss_gradients(x_train_mnist[0:1])
 

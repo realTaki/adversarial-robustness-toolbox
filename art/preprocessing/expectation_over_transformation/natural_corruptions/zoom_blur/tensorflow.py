@@ -18,8 +18,11 @@
 """
 This module implements EoT of zoom blur with uniformly sampled zoom factor.
 """
+
+from __future__ import annotations
+
 import logging
-from typing import Tuple, Union, TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -39,8 +42,8 @@ class EoTZoomBlurTensorFlow(EoTTensorFlowV2):
     def __init__(
         self,
         nb_samples: int,
-        clip_values: Tuple[float, float],
-        zoom: Union[float, Tuple[float, float]],
+        clip_values: tuple[float, float],
+        zoom: float | tuple[float, float],
         apply_fit: bool = False,
         apply_predict: bool = True,
     ) -> None:
@@ -63,9 +66,7 @@ class EoTZoomBlurTensorFlow(EoTTensorFlowV2):
         self.zoom_range = (1.0, zoom) if isinstance(zoom, (int, float)) else zoom
         self._check_params()
 
-    def _transform(
-        self, x: "tf.Tensor", y: Optional["tf.Tensor"], **kwargs
-    ) -> Tuple["tf.Tensor", Optional["tf.Tensor"]]:
+    def _transform(self, x: "tf.Tensor", y: "tf.Tensor" | None, **kwargs) -> tuple["tf.Tensor", "tf.Tensor" | None]:
         """
         Transformation of an image with randomly sampled zoom blur.
 
@@ -73,7 +74,7 @@ class EoTZoomBlurTensorFlow(EoTTensorFlowV2):
         :param y: Label of the samples `x`.
         :return: Transformed samples and labels.
         """
-        import tensorflow as tf  # lgtm [py/repeated-import]
+        import tensorflow as tf
 
         nb_zooms = 10
         x_blur = tf.zeros_like(x)
@@ -104,7 +105,7 @@ class EoTZoomBlurTensorFlow(EoTTensorFlowV2):
 
     def _check_params(self) -> None:
 
-        # pylint: disable=R0916
+        # pylint: disable=too-many-boolean-expressions
         if not isinstance(self.zoom, (int, float, tuple)) or (
             isinstance(self.zoom, tuple)
             and (

@@ -2,6 +2,16 @@
 ====================================
 .. automodule:: art.defences.detector.evasion
 
+Base Class
+------------------------
+.. autoclass:: EvasionDetector
+   :members:
+
+Be Your Own Neighbourhood Detector (BEYOND)- PyTorch
+----------------------------------------------------
+.. autoclass:: BeyondDetectorPyTorch
+   :members:
+
 Binary Input Detector
 ---------------------
 .. autoclass:: BinaryInputDetector
@@ -10,4 +20,9 @@ Binary Input Detector
 Binary Activation Detector
 --------------------------
 .. autoclass:: BinaryActivationDetector
+   :members:
+
+Subset Scanning Detector
+------------------------
+.. autoclass:: SubsetScanningDetector
    :members:

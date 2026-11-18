@@ -18,7 +18,8 @@
 """
 This module implements the abstract base class for defences that adversarially train models.
 """
-from __future__ import absolute_import, division, print_function, unicode_literals
+
+from __future__ import absolute_import, division, print_function, unicode_literals, annotations
 
 import abc
 from typing import TYPE_CHECKING
@@ -41,9 +42,7 @@ class Trainer(abc.ABC):
         self._classifier = classifier
 
     @abc.abstractmethod
-    def fit(  # lgtm [py/inheritance/incorrect-overridden-signature]
-        self, x: np.ndarray, y: np.ndarray, **kwargs
-    ) -> None:
+    def fit(self, x: np.ndarray, y: np.ndarray, **kwargs) -> None:
         """
         Train the model.
 
@@ -52,6 +51,15 @@ class Trainer(abc.ABC):
         :param kwargs: Other parameters.
         """
         raise NotImplementedError
+
+    @property
+    def classifier(self) -> "CLASSIFIER_LOSS_GRADIENTS_TYPE":
+        """
+        Access function to get the classifier.
+
+        :return: The classifier.
+        """
+        return self._classifier
 
     def get_classifier(self) -> "CLASSIFIER_LOSS_GRADIENTS_TYPE":
         """

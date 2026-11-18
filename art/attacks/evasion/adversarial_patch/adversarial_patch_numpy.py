@@ -21,11 +21,12 @@ can be printed into the physical world with a common printer. The patch can be u
 
 | Paper link: https://arxiv.org/abs/1712.09665
 """
-from __future__ import absolute_import, division, print_function, unicode_literals
+
+from __future__ import absolute_import, division, print_function, unicode_literals, annotations
 
 import logging
 import math
-from typing import Optional, Union, Tuple, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 import random
 import numpy as np
@@ -72,8 +73,9 @@ class AdversarialPatchNumpy(EvasionAttack):
         scale_max: float = 1.0,
         learning_rate: float = 5.0,
         max_iter: int = 500,
-        clip_patch: Union[list, tuple, None] = None,
+        clip_patch: list | tuple | None = None,
         batch_size: int = 16,
+        targeted: bool = True,
         verbose: bool = True,
     ) -> None:
         """
@@ -92,6 +94,8 @@ class AdversarialPatchNumpy(EvasionAttack):
         :param clip_patch: The minimum and maximum values for each channel in the form
                [(float, float), (float, float), (float, float)].
         :param batch_size: The size of the training batch.
+        :param targeted: Indicates whether the attack is targeted (True) or untargeted (False). Currently only targeted
+               attacks are supported.
         :param verbose: Show progress bars.
         """
         super().__init__(estimator=classifier)
@@ -104,6 +108,7 @@ class AdversarialPatchNumpy(EvasionAttack):
         self.max_iter = max_iter
         self.batch_size = batch_size
         self.clip_patch = clip_patch
+        self.targeted = targeted
         self.verbose = verbose
         self._check_params()
 
@@ -149,8 +154,8 @@ class AdversarialPatchNumpy(EvasionAttack):
         self.reset_patch(self.mean_value)
 
     def generate(  # type: ignore
-        self, x: np.ndarray, y: Optional[np.ndarray] = None, **kwargs
-    ) -> Tuple[np.ndarray, np.ndarray]:
+        self, x: np.ndarray, y: np.ndarray | None = None, **kwargs
+    ) -> tuple[np.ndarray, np.ndarray]:
         """
         Generate an adversarial patch and return the patch and its mask in arrays.
 
@@ -247,7 +252,11 @@ class AdversarialPatchNumpy(EvasionAttack):
         return self.patch, self._get_circular_patch_mask()
 
     def apply_patch(
-        self, x: np.ndarray, scale: float, patch_external: np.ndarray = None, mask: Optional[np.ndarray] = None
+        self,
+        x: np.ndarray,
+        scale: float,
+        patch_external: np.ndarray | None = None,
+        mask: np.ndarray | None = None,
     ) -> np.ndarray:
         """
         A function to apply the learned adversarial patch to images or videos.
@@ -255,7 +264,7 @@ class AdversarialPatchNumpy(EvasionAttack):
         :param x: Instances to apply randomly transformed patch.
         :param scale: Scale of the applied patch in relation to the classifier input shape.
         :param patch_external: External patch to apply to images `x`.
-        :param mask: An boolean array of shape equal to the shape of a single samples (1, H, W) or the shape of `x`
+        :param mask: A boolean array of shape equal to the shape of a single samples (1, H, W) or the shape of `x`
                      (N, H, W) without their channel dimensions. Any features for which the mask is True can be the
                      center location of the patch during sampling.
         :return: The patched instances.
@@ -299,6 +308,12 @@ class AdversarialPatchNumpy(EvasionAttack):
         if self.batch_size <= 0:
             raise ValueError("The batch size must be greater than 0.")
 
+        if not isinstance(self.targeted, bool) and not self.targeted:
+            raise ValueError(
+                "The argument `targeted` has to be of type bool. Currently AdversarialPatchNumpy only supports targeted"
+                "attacks."
+            )
+
         if not isinstance(self.verbose, bool):
             raise ValueError("The argument `verbose` has to be of type bool.")
 
@@ -311,7 +326,7 @@ class AdversarialPatchNumpy(EvasionAttack):
         x = np.linspace(-1, 1, diameter)
         y = np.linspace(-1, 1, diameter)
         x_grid, y_grid = np.meshgrid(x, y, sparse=True)
-        z_grid = (x_grid ** 2 + y_grid ** 2) ** sharpness
+        z_grid = (x_grid**2 + y_grid**2) ** sharpness
 
         mask = 1 - np.clip(z_grid, -1, 1)
 
@@ -592,7 +607,7 @@ class AdversarialPatchNumpy(EvasionAttack):
 
         return gradients
 
-    def reset_patch(self, initial_patch_value: Optional[Union[float, np.ndarray]]) -> None:
+    def reset_patch(self, initial_patch_value: float | np.ndarray | None) -> None:
         """
         Reset the adversarial patch.
 
@@ -600,9 +615,9 @@ class AdversarialPatchNumpy(EvasionAttack):
         """
         if initial_patch_value is None:
             self.patch = np.ones(shape=self.patch_shape).astype(np.float32) * self.mean_value
-        elif isinstance(initial_patch_value, float):
+        elif isinstance(initial_patch_value, (float, int, np.floating, np.integer)):
             self.patch = np.ones(shape=self.patch_shape).astype(np.float32) * initial_patch_value
-        elif self.patch is not None and self.patch.shape == initial_patch_value.shape:
+        elif isinstance(initial_patch_value, np.ndarray) and self.patch_shape == initial_patch_value.shape:
             self.patch = initial_patch_value
         else:
             raise ValueError("Unexpected value for initial_patch_value.")

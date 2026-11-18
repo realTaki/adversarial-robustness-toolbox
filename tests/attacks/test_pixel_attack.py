@@ -25,6 +25,7 @@ The Pixel Attack is a generalisation of One Pixel Attack.
 | Pixel Attack Paper link:
     https://arxiv.org/abs/1906.06026
 """
+
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
@@ -90,6 +91,15 @@ class TestPixelAttack(TestBase):
         x_test = np.reshape(self.x_test_mnist, (self.x_test_mnist.shape[0], 1, 28, 28)).astype(np.float32)
         classifier = get_image_classifier_pt()
         self._test_attack(classifier, x_test, self.y_test_mnist, False)
+
+    def test_8_pytorch_mnist_single_sample(self):
+        """
+        Test with the PyTorchClassifier on a single sample. (Untargeted Attack)
+        :return:
+        """
+        x_test = np.reshape(self.x_test_mnist[1], (1, 1, 28, 28)).astype(np.float32)
+        classifier = get_image_classifier_pt()
+        self._test_attack(classifier, x_test, self.y_test_mnist[[1]], False)
 
     # def test_7_keras_mnist_targeted(self):
     #     """

@@ -20,18 +20,18 @@ This module implements Randomized Smoothing applied to classifier predictions.
 
 | Paper link: https://arxiv.org/abs/1902.02918
 """
-from __future__ import absolute_import, division, print_function, unicode_literals
+
+from __future__ import absolute_import, division, print_function, unicode_literals, annotations
 
 from abc import ABC
 import logging
-from typing import Optional, Tuple
+
 
 import numpy as np
 from scipy.stats import norm
 from tqdm.auto import tqdm
 
 from art.config import ART_NUMPY_DTYPE
-from art.defences.preprocessor.gaussian_augmentation import GaussianAugmentation
 
 logger = logging.getLogger(__name__)
 
@@ -70,22 +70,23 @@ class RandomizedSmoothingMixin(ABC):
 
         :param x: Input samples.
         :param batch_size: Size of batches.
-        :param training_mode: `True` for model set to training mode and `'False` for model set to evaluation mode.
+        :param training_mode: `True` for model set to training mode and `False` for model set to evaluation mode.
         :return: Array of predictions of shape `(nb_inputs, nb_classes)`.
         """
         raise NotImplementedError
 
-    def predict(self, x: np.ndarray, batch_size: int = 128, **kwargs) -> np.ndarray:
+    def predict(self, x: np.ndarray, batch_size: int = 128, verbose: bool = False, **kwargs) -> np.ndarray:
         """
         Perform prediction of the given classifier for a batch of inputs, taking an expectation over transformations.
 
         :param x: Input samples.
         :param batch_size: Batch size.
+        :param verbose: Display training progress bar.
         :param is_abstain: True if function will abstain from prediction and return 0s. Default: True
         :type is_abstain: `boolean`
         :return: Array of predictions of shape `(nb_inputs, nb_classes)`.
         """
-        from scipy.stats import binom_test
+        from scipy.stats import binomtest
 
         is_abstain = kwargs.get("is_abstain")
         if is_abstain is not None and not isinstance(is_abstain, bool):  # pragma: no cover
@@ -96,16 +97,19 @@ class RandomizedSmoothingMixin(ABC):
         logger.info("Applying randomized smoothing.")
         n_abstained = 0
         prediction = []
-        for x_i in tqdm(x, desc="Randomized smoothing"):
+        for x_i in tqdm(x, desc="Randomized smoothing", disable=not verbose):
             # get class counts
             counts_pred = self._prediction_counts(x_i, batch_size=batch_size)
             top = counts_pred.argsort()[::-1]
-            count1 = np.max(counts_pred)
-            count2 = counts_pred[top[1]]
+            # conversion to int
+            count1 = int(np.max(counts_pred))
+            count2 = int(counts_pred[top[1]])
 
             # predict or abstain
             smooth_prediction = np.zeros(counts_pred.shape)
-            if (not is_abstain) or (binom_test(count1, count1 + count2, p=0.5) <= self.alpha):
+            # get p value from BinomTestResult object
+            p_value = binomtest(count1, count1 + count2, p=0.5).pvalue
+            if (not is_abstain) or (p_value <= self.alpha):
                 smooth_prediction[np.argmax(counts_pred)] = 1
             elif is_abstain:
                 n_abstained += 1
@@ -141,11 +145,9 @@ class RandomizedSmoothingMixin(ABC):
         :param kwargs: Dictionary of framework-specific arguments. This parameter is not currently supported for PyTorch
                and providing it takes no effect.
         """
-        g_a = GaussianAugmentation(sigma=self.scale, augmentation=False)
-        x_rs, _ = g_a(x)
-        self._fit_classifier(x_rs, y, batch_size=batch_size, nb_epochs=nb_epochs, **kwargs)
+        self._fit_classifier(x, y, batch_size=batch_size, nb_epochs=nb_epochs, **kwargs)
 
-    def certify(self, x: np.ndarray, n: int, batch_size: int = 32) -> Tuple[np.ndarray, np.ndarray]:
+    def certify(self, x: np.ndarray, n: int, batch_size: int = 32) -> tuple[np.ndarray, np.ndarray]:
         """
         Computes certifiable radius around input `x` and returns radius `r` and prediction.
 
@@ -178,7 +180,7 @@ class RandomizedSmoothingMixin(ABC):
 
         return np.array(prediction), np.array(radius)
 
-    def _noisy_samples(self, x: np.ndarray, n: Optional[int] = None) -> np.ndarray:
+    def _noisy_samples(self, x: np.ndarray, n: int | None = None) -> np.ndarray:
         """
         Adds Gaussian noise to `x` to generate samples. Optionally augments `y` similarly.
 
@@ -197,7 +199,7 @@ class RandomizedSmoothingMixin(ABC):
 
         return x
 
-    def _prediction_counts(self, x: np.ndarray, n: Optional[int] = None, batch_size: int = 128) -> np.ndarray:
+    def _prediction_counts(self, x: np.ndarray, n: int | None = None, batch_size: int = 128) -> np.ndarray:
         """
         Makes predictions and then converts probability distribution to counts.
 
@@ -212,7 +214,7 @@ class RandomizedSmoothingMixin(ABC):
 
         # convert to binary predictions
         idx = np.argmax(predictions, axis=-1)
-        pred = np.zeros(predictions.shape)
+        pred = np.zeros_like(predictions)
         pred[np.arange(pred.shape[0]), idx] = 1
 
         # get class counts

@@ -51,33 +51,31 @@ def test_generate_2d_dct_basis(art_warning, image_dl_estimator):
         assert dct.shape == (res * res, sub_dim * sub_dim)
         dct_50000 = np.array(
             [
-                [
-                    0.00446429,
-                    -0.0063133,
-                    0.00631283,
-                    -0.00631206,
-                    0.00631097,
-                    0.00490833,
-                    -0.00694126,
-                    0.00694075,
-                    -0.00693989,
-                    0.0069387,
-                    0.00131841,
-                    -0.00186447,
-                    0.00186434,
-                    -0.00186411,
-                    0.00186379,
-                    -0.00285836,
-                    0.00404223,
-                    -0.00404193,
-                    0.00404143,
-                    -0.00404074,
-                    -0.00576281,
-                    0.00814965,
-                    -0.00814905,
-                    0.00814805,
-                    -0.00814664,
-                ]
+                0.00446429,
+                -0.0063133,
+                0.00631283,
+                -0.00631206,
+                0.00631097,
+                0.00490833,
+                -0.00694126,
+                0.00694075,
+                -0.00693989,
+                0.0069387,
+                0.00131841,
+                -0.00186447,
+                0.00186434,
+                -0.00186411,
+                0.00186379,
+                -0.00285836,
+                0.00404223,
+                -0.00404193,
+                0.00404143,
+                -0.00404074,
+                -0.00576281,
+                0.00814965,
+                -0.00814905,
+                0.00814805,
+                -0.00814664,
             ]
         )
         np.testing.assert_almost_equal(dct[50000], dct_50000)
@@ -88,7 +86,7 @@ def test_generate_2d_dct_basis(art_warning, image_dl_estimator):
 @pytest.mark.framework_agnostic
 def test_is_adversarial(art_warning, image_dl_estimator, fix_get_mnist_subset):
     try:
-        (x_train_mnist, y_train_mnist, x_test_mnist, y_test_mnist) = fix_get_mnist_subset
+        x_train_mnist, y_train_mnist, x_test_mnist, y_test_mnist = fix_get_mnist_subset
 
         classifier, _ = image_dl_estimator(from_logits=True)
         attack = GeoDA(estimator=classifier, sub_dim=5, max_iter=4000, verbose=False)
@@ -102,7 +100,7 @@ def test_is_adversarial(art_warning, image_dl_estimator, fix_get_mnist_subset):
 @pytest.mark.framework_agnostic
 def test_find_random_adversarial(art_warning, image_dl_estimator, fix_get_mnist_subset):
     try:
-        (x_train_mnist, y_train_mnist, x_test_mnist, y_test_mnist) = fix_get_mnist_subset
+        x_train_mnist, y_train_mnist, x_test_mnist, y_test_mnist = fix_get_mnist_subset
 
         classifier, _ = image_dl_estimator(from_logits=True)
         attack = GeoDA(estimator=classifier, sub_dim=5, max_iter=4000, verbose=False)
@@ -133,7 +131,7 @@ def test_opt_query_iteration(art_warning, image_dl_estimator):
 @pytest.mark.framework_agnostic
 def test_sub_noise(art_warning, image_dl_estimator, fix_get_mnist_subset):
     try:
-        (x_train_mnist, y_train_mnist, x_test_mnist, y_test_mnist) = fix_get_mnist_subset
+        x_train_mnist, y_train_mnist, x_test_mnist, y_test_mnist = fix_get_mnist_subset
 
         classifier, _ = image_dl_estimator(from_logits=True)
         attack = GeoDA(estimator=classifier, sub_dim=5, max_iter=4000, verbose=False)
@@ -147,7 +145,7 @@ def test_sub_noise(art_warning, image_dl_estimator, fix_get_mnist_subset):
 @pytest.mark.framework_agnostic
 def test_generate(art_warning, fix_get_mnist_subset, image_dl_estimator):
     try:
-        (x_train_mnist, y_train_mnist, x_test_mnist, y_test_mnist) = fix_get_mnist_subset
+        x_train_mnist, y_train_mnist, x_test_mnist, y_test_mnist = fix_get_mnist_subset
 
         classifier, _ = image_dl_estimator(from_logits=True)
         attack = GeoDA(estimator=classifier, sub_dim=5, max_iter=400, verbose=False)

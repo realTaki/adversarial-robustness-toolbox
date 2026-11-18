@@ -18,8 +18,11 @@
 """
 This module implements mixin abstract base classes defining properties for all classifiers in ART.
 """
+
+from __future__ import annotations
+
 from abc import ABC, ABCMeta, abstractmethod
-from typing import List, Optional, Union
+
 
 import numpy as np
 
@@ -33,13 +36,13 @@ from art.estimators.estimator import (
 
 class InputFilter(ABCMeta):
     """
-    Metaclass to ensure that inputs are ndarray for all of the subclass generate and extract calls.
+    Metaclass to ensure that inputs are ndarray for all the subclass generate and extract calls.
     """
 
-    def __init__(cls, name, bases, clsdict):  # pylint: disable=W0231,W0613
+    def __init__(cls, name, bases, clsdict):
         """
         This function overrides any existing generate or extract methods with a new method that
-        ensures the input is an ndarray. There is an assumption that the input object has implemented
+        ensures the input is a ndarray. There is an assumption that the input object has implemented
         __array__ with np.array calls.
         """
 
@@ -51,6 +54,8 @@ class InputFilter(ABCMeta):
             def replacement_function(self, *args, **kwargs):
                 if len(args) > 0:
                     lst = list(args)
+                else:
+                    lst = []
 
                 if "x" in kwargs:  # pragma: no cover
                     if not isinstance(kwargs["x"], np.ndarray):
@@ -112,7 +117,7 @@ class ClassifierMixin(ABC, metaclass=InputFilter):
         """
         Set the number of output classes.
         """
-        if nb_classes is None or nb_classes < 2:
+        if nb_classes is None or (isinstance(nb_classes, (int, np.integer)) and nb_classes < 2):
             raise ValueError("nb_classes must be greater than or equal to 2.")
 
         self._nb_classes = nb_classes
@@ -126,7 +131,7 @@ class ClassGradientsMixin(ABC):
     """
 
     @abstractmethod
-    def class_gradient(self, x: np.ndarray, label: Optional[Union[int, List[int]]] = None, **kwargs) -> np.ndarray:
+    def class_gradient(self, x: np.ndarray, label: int | list[int] | np.ndarray | None = None, **kwargs) -> np.ndarray:
         """
         Compute per-class derivatives w.r.t. `x`.
 
@@ -167,7 +172,7 @@ class ClassifierClassLossGradients(ClassGradientsMixin, ClassifierMixin, LossGra
     estimator_params = BaseEstimator.estimator_params + ClassifierMixin.estimator_params
 
 
-class ClassifierNeuralNetwork(  # lgtm [py/conflicting-attributes]
+class ClassifierNeuralNetwork(
     ClassGradientsMixin, ClassifierMixin, LossGradientsMixin, NeuralNetworkMixin, BaseEstimator, ABC
 ):
     """
@@ -179,7 +184,7 @@ class ClassifierNeuralNetwork(  # lgtm [py/conflicting-attributes]
     )
 
     @abstractmethod
-    def save(self, filename: str, path: Optional[str] = None) -> None:
+    def save(self, filename: str, path: str | None = None) -> None:
         """
         Save a model to file in the format specific to the backend framework. This function is not supported for
         ensembles.
@@ -187,6 +192,12 @@ class ClassifierNeuralNetwork(  # lgtm [py/conflicting-attributes]
         :param filename: Name of the file where to store the model.
         :param path: Path of the folder where to store the model. If no path is specified, the model will be stored in
                      the default data location of the library `ART_DATA_PATH`.
+        """
+        raise NotImplementedError
+
+    def clone_for_refitting(self) -> "ClassifierNeuralNetwork":
+        """
+        Clone classifier for refitting.
         """
         raise NotImplementedError
 

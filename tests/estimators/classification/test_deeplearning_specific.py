@@ -147,7 +147,7 @@ def test_pickle(art_warning, get_default_mnist_subset, image_dl_estimator):
 
 
 @pytest.mark.skip_module("apex.amp")
-@pytest.mark.skip_framework("tensorflow", "tensorflow2v1", "keras", "kerastf", "mxnet", "non_dl_frameworks")
+@pytest.mark.skip_framework("tensorflow", "keras", "kerastf", "non_dl_frameworks")
 @pytest.mark.parametrize("device_type", ["cpu", "gpu"])
 def test_loss_gradient_amp(
     art_warning,
@@ -163,7 +163,7 @@ def test_loss_gradient_amp(
     from art.estimators.classification.pytorch import PyTorchClassifier
 
     try:
-        (expected_gradients_1, expected_gradients_2) = expected_values()
+        expected_gradients_1, expected_gradients_2 = expected_values()
 
         (_, _), (x_test_mnist, y_test_mnist) = get_default_mnist_subset
 
@@ -241,7 +241,7 @@ def test_loss_gradient_amp(
         art_warning(e)
 
 
-@pytest.mark.skip_framework("tensorflow2", "tensorflow2v1", "keras", "kerastf", "mxnet", "non_dl_frameworks")
+@pytest.mark.skip_framework("tensorflow2", "keras", "kerastf", "non_dl_frameworks")
 def test_tensorflow_1_state(
     art_warning,
     image_dl_estimator,

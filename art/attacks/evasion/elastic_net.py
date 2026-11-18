@@ -20,10 +20,11 @@ This module implements the elastic net attack `ElasticNet`. This is a white-box 
 
 | Paper link: https://arxiv.org/abs/1709.04114
 """
-from __future__ import absolute_import, division, print_function, unicode_literals
+
+from __future__ import absolute_import, division, print_function, unicode_literals, annotations
 
 import logging
-from typing import Optional, Tuple, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 import numpy as np
 import six
@@ -190,11 +191,11 @@ class ElasticNet(EvasionAttack):
         :return: The decayed learning rate
         """
         learn_rate = self.learning_rate - end_learning_rate
-        decayed_learning_rate = learn_rate * (1 - global_step / decay_steps) ** 2 + end_learning_rate
+        decayed_learning_rate = learn_rate * (1 - global_step / decay_steps) ** 0.5 + end_learning_rate
 
         return decayed_learning_rate
 
-    def generate(self, x: np.ndarray, y: Optional[np.ndarray] = None, **kwargs) -> np.ndarray:
+    def generate(self, x: np.ndarray, y: np.ndarray | None = None, **kwargs) -> np.ndarray:
         """
         Generate adversarial samples and return them in an array.
 
@@ -205,7 +206,7 @@ class ElasticNet(EvasionAttack):
         :return: An array holding the adversarial examples.
         """
         if y is not None:
-            y = check_and_transform_label_format(y, self.estimator.nb_classes)
+            y = check_and_transform_label_format(y, nb_classes=self.estimator.nb_classes)
         x_adv = x.astype(ART_NUMPY_DTYPE)
 
         # Assert that, if attack is targeted, y is provided:
@@ -254,7 +255,7 @@ class ElasticNet(EvasionAttack):
         c_lower_bound = np.zeros(x_batch.shape[0])
         c_upper_bound = 10e10 * np.ones(x_batch.shape[0])
 
-        # Initialize best distortions and best attacks globally
+        # Initialize the best distortions and best attacks globally
         o_best_dist = np.inf * np.ones(x_batch.shape[0])
         o_best_attack = x_batch.copy()
 
@@ -288,7 +289,7 @@ class ElasticNet(EvasionAttack):
         c_batch: np.ndarray,
         c_lower_bound: np.ndarray,
         c_upper_bound: np.ndarray,
-    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
         Update constants.
 
@@ -329,7 +330,7 @@ class ElasticNet(EvasionAttack):
         :param x_batch: A batch of original examples.
         :param y_batch: A batch of targets (0-1 hot).
         :param c_batch: A batch of constants.
-        :return: A tuple of best elastic distances, best labels, best attacks
+        :return: A tuple of the best elastic distances, best labels, best attacks
         """
 
         def compare(o_1, o_2):
@@ -337,7 +338,7 @@ class ElasticNet(EvasionAttack):
                 return o_1 == o_2
             return o_1 != o_2
 
-        # Initialize best distortions and best changed labels and best attacks
+        # Initialize the best distortions and best changed labels and best attacks
         best_dist = np.inf * np.ones(x_batch.shape[0])
         best_label = [-np.inf] * x_batch.shape[0]
         best_attack = x_batch.copy()
@@ -360,7 +361,7 @@ class ElasticNet(EvasionAttack):
             x_adv = x_adv_next
 
             # Adjust the best result
-            (logits, l1dist, l2dist, endist) = self._loss(x=x_batch, x_adv=x_adv)
+            logits, l1dist, l2dist, endist = self._loss(x=x_batch, x_adv=x_adv)
 
             if self.decision_rule == "EN":
                 zip_set = zip(endist, logits)

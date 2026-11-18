@@ -20,8 +20,11 @@ This module implements the evasion attack `ShadowAttack`.
 
 | Paper link: https://arxiv.org/abs/2003.08937
 """
+
+from __future__ import annotations
+
 import logging
-from typing import Optional, Union
+
 
 import numpy as np
 from tqdm.auto import trange
@@ -63,9 +66,9 @@ class ShadowAttack(EvasionAttack):
 
     def __init__(
         self,
-        estimator: Union[
-            TensorFlowV2Classifier, TensorFlowV2RandomizedSmoothing, PyTorchClassifier, PyTorchRandomizedSmoothing
-        ],
+        estimator: (
+            TensorFlowV2Classifier | TensorFlowV2RandomizedSmoothing | PyTorchClassifier | PyTorchRandomizedSmoothing
+        ),
         sigma: float = 0.5,
         nb_steps: int = 300,
         learning_rate: float = 0.1,
@@ -103,7 +106,7 @@ class ShadowAttack(EvasionAttack):
         self.verbose = verbose
         self._check_params()
 
-        self.framework: Optional[str]
+        self.framework: str | None
         if isinstance(self.estimator, (TensorFlowV2Classifier, TensorFlowV2RandomizedSmoothing)):
             self.framework = "tensorflow"
         elif isinstance(self.estimator, (PyTorchClassifier, PyTorchRandomizedSmoothing)):
@@ -111,7 +114,7 @@ class ShadowAttack(EvasionAttack):
         else:
             self.framework = None
 
-    def generate(self, x: np.ndarray, y: Optional[np.ndarray] = None, **kwargs) -> np.ndarray:
+    def generate(self, x: np.ndarray, y: np.ndarray | None = None, **kwargs) -> np.ndarray:
         """
         Generate adversarial samples and return them in an array. This requires a lot of memory, therefore it accepts
         only a single samples as input, e.g. a batch of size 1.
@@ -121,7 +124,7 @@ class ShadowAttack(EvasionAttack):
         :return: An array with the adversarial examples.
         """
         if y is not None:
-            y = check_and_transform_label_format(y, self.estimator.nb_classes)
+            y = check_and_transform_label_format(y, nb_classes=self.estimator.nb_classes)
 
         if y is None:
             # Throw error if attack is targeted, but no targets are provided
@@ -206,6 +209,8 @@ class ShadowAttack(EvasionAttack):
                             ord=2,
                             axis=(1, 2),
                         )
+                    else:
+                        raise ValueError("Value for number of channels in `perturbation_t.shape` not recognized.")
 
                     loss_c = tf.norm(tf.reduce_mean(tf.abs(perturbation_t), axis=[2, 3]), ord=2, axis=1) ** 2
                     loss = self.lambda_tv * loss_tv + self.lambda_s * loss_s + self.lambda_c * loss_c
@@ -233,11 +238,13 @@ class ShadowAttack(EvasionAttack):
                     + (perturbation_t[:, 1, :, :] - perturbation_t[:, 2, :, :]) ** 2
                     + (perturbation_t[:, 0, :, :] - perturbation_t[:, 2, :, :]) ** 2
                 ).norm(p=2, dim=(1, 2))
+            else:
+                raise ValueError("Value for number of channels in `perturbation_t.shape` not recognized.")
 
             loss_c = perturbation_t.abs().mean([2, 3]).norm(dim=1) ** 2
             loss = torch.mean(self.lambda_tv * loss_tv + self.lambda_s * loss_s + self.lambda_c * loss_c)
             loss.backward()
-            gradients = perturbation_t.grad.numpy()
+            gradients = perturbation_t.grad.numpy()  # type: ignore
         else:
             raise NotImplementedError
 

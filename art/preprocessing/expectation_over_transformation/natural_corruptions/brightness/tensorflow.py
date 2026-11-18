@@ -18,8 +18,11 @@
 """
 This module implements EoT of changes in brightness by addition of uniformly sampled delta.
 """
+
+from __future__ import annotations
+
 import logging
-from typing import Tuple, Union, TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -39,8 +42,8 @@ class EoTBrightnessTensorFlow(EoTTensorFlowV2):
     def __init__(
         self,
         nb_samples: int,
-        clip_values: Tuple[float, float],
-        delta: Union[float, Tuple[float, float]],
+        clip_values: tuple[float, float],
+        delta: float | tuple[float, float],
         apply_fit: bool = False,
         apply_predict: bool = True,
     ) -> None:
@@ -63,9 +66,7 @@ class EoTBrightnessTensorFlow(EoTTensorFlowV2):
         self.delta_range = (-delta, delta) if isinstance(delta, (int, float)) else delta
         self._check_params()
 
-    def _transform(
-        self, x: "tf.Tensor", y: Optional["tf.Tensor"], **kwargs
-    ) -> Tuple["tf.Tensor", Optional["tf.Tensor"]]:
+    def _transform(self, x: "tf.Tensor", y: "tf.Tensor" | None, **kwargs) -> tuple["tf.Tensor", "tf.Tensor" | None]:
         """
         Transformation of an image with randomly sampled brightness.
 
@@ -73,14 +74,14 @@ class EoTBrightnessTensorFlow(EoTTensorFlowV2):
         :param y: Label of the samples `x`.
         :return: Transformed samples and labels.
         """
-        import tensorflow as tf  # lgtm [py/repeated-import]
+        import tensorflow as tf
 
         delta_i = np.random.uniform(low=self.delta_range[0], high=self.delta_range[1])
         return tf.clip_by_value(x + delta_i, clip_value_min=self.clip_values[0], clip_value_max=self.clip_values[1]), y
 
     def _check_params(self) -> None:
 
-        # pylint: disable=R0916
+        # pylint: disable=too-many-boolean-expressions
         if not isinstance(self.delta, (int, float, tuple)) or (
             isinstance(self.delta, tuple)
             and (

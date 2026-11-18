@@ -18,14 +18,15 @@
 """
 This module implements the classifier `XGBoostClassifier` for XGBoost models.
 """
-from __future__ import absolute_import, division, print_function, unicode_literals
+
+from __future__ import absolute_import, division, print_function, unicode_literals, annotations
 
 from copy import deepcopy
 import json
 import logging
 import os
 import pickle
-from typing import List, Optional, Union, Tuple, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -34,8 +35,8 @@ from art.utils import to_categorical
 from art import config
 
 if TYPE_CHECKING:
-    # pylint: disable=C0412
-    import xgboost  # lgtm [py/import-and-import-from]
+
+    import xgboost
 
     from art.utils import CLIP_VALUES_TYPE, PREPROCESSING_TYPE
     from art.defences.preprocessor import Preprocessor
@@ -56,13 +57,13 @@ class XGBoostClassifier(ClassifierDecisionTree):
 
     def __init__(
         self,
-        model: Union["xgboost.Booster", "xgboost.XGBClassifier", None] = None,
-        clip_values: Optional["CLIP_VALUES_TYPE"] = None,
-        preprocessing_defences: Union["Preprocessor", List["Preprocessor"], None] = None,
-        postprocessing_defences: Union["Postprocessor", List["Postprocessor"], None] = None,
+        model: "xgboost.Booster" | "xgboost.XGBClassifier" | None = None,
+        clip_values: "CLIP_VALUES_TYPE" | None = None,
+        preprocessing_defences: "Preprocessor" | list["Preprocessor"] | None = None,
+        postprocessing_defences: "Postprocessor" | list["Postprocessor"] | None = None,
         preprocessing: "PREPROCESSING_TYPE" = (0.0, 1.0),
-        nb_features: Optional[int] = None,
-        nb_classes: Optional[int] = None,
+        nb_features: int | None = None,
+        nb_classes: int | None = None,
     ) -> None:
         """
         Create a `Classifier` instance from a XGBoost model.
@@ -92,10 +93,12 @@ class XGBoostClassifier(ClassifierDecisionTree):
             preprocessing=preprocessing,
         )
         self._input_shape = (nb_features,)
-        self._nb_classes = self._get_nb_classes(nb_classes)
+        _nb_classes = self._get_nb_classes(nb_classes)
+        if _nb_classes is not None:
+            self._nb_classes = _nb_classes
 
     @property
-    def input_shape(self) -> Tuple[int, ...]:
+    def input_shape(self) -> tuple[int, ...]:
         """
         Return the shape of one input sample.
 
@@ -114,16 +117,23 @@ class XGBoostClassifier(ClassifierDecisionTree):
 
     def fit(self, x: np.ndarray, y: np.ndarray, **kwargs) -> None:
         """
-        Fit the classifier on the training set `(x, y)`.
+        Fit the classifier on the training set `(x, y)`. Only supported for models of type XGBClassifier.
 
         :param x: Training data.
         :param y: Target values (class labels) one-hot-encoded of shape (nb_samples, nb_classes).
         :param kwargs: Dictionary of framework-specific arguments. These should be parameters supported by the
-                       `fit` function in `xgboost.Booster` or `xgboost.XGBClassifier` and will be passed to this
-                       function as such.
-        :raises `NotImplementedException`: This method is not supported for XGBoost classifiers.
+                       `fit` function in `xgboost.XGBClassifier` and will be passed to this function as such.
+        :raises `NotImplementedException`: This method is not supported for Booster objects.
         """
-        raise NotImplementedError
+        import xgboost
+
+        if isinstance(self._model, xgboost.XGBClassifier):
+            self._model.fit(x, y, **kwargs)
+            _nb_classes = self._get_nb_classes(self._nb_classes)
+            if _nb_classes is not None:
+                self._nb_classes = _nb_classes
+        else:
+            raise NotImplementedError
 
     def predict(self, x: np.ndarray, **kwargs) -> np.ndarray:
         """
@@ -132,7 +142,7 @@ class XGBoostClassifier(ClassifierDecisionTree):
         :param x: Input samples.
         :return: Array of predictions of shape `(nb_inputs, nb_classes)`.
         """
-        import xgboost  # lgtm [py/repeated-import] lgtm [py/import-and-import-from]
+        import xgboost
 
         # Apply preprocessing
         x_preprocessed, _ = self._apply_preprocessing(x, y=None, fit=False)
@@ -144,13 +154,38 @@ class XGBoostClassifier(ClassifierDecisionTree):
                 y_prediction = to_categorical(labels=y_prediction, nb_classes=self.nb_classes)
         elif isinstance(self._model, xgboost.XGBClassifier):
             y_prediction = self._model.predict_proba(x_preprocessed)
+        else:
+            raise ValueError("Type of model not recognized.")
 
         # Apply postprocessing
         y_prediction = self._apply_postprocessing(preds=y_prediction, fit=False)
 
         return y_prediction
 
-    def _get_nb_classes(self, nb_classes: Optional[int]) -> int:
+    def clone_for_refitting(
+        self,
+    ) -> "XGBoostClassifier":
+        """
+        Create a copy of the estimator that can be refit from scratch. Only supported for models of type XGBClassifier.
+
+        :return: new estimator.
+        :raises `NotImplementedError`: This method is not supported for Booster objects.
+        """
+        import xgboost
+
+        if isinstance(self._model, xgboost.XGBClassifier):
+            params = self.get_params()
+            del params["model"]
+            internal_params = self._model.get_params()
+            new_classifier = xgboost.XGBClassifier()
+            new_classifier.set_params(**internal_params)
+            new_estimator = XGBoostClassifier(new_classifier)
+            new_estimator.set_params(**params)
+            return new_estimator
+
+        raise NotImplementedError
+
+    def _get_nb_classes(self, nb_classes: int | None) -> int | None:
         """
         Return the number of output classes.
 
@@ -158,23 +193,20 @@ class XGBoostClassifier(ClassifierDecisionTree):
         """
         from xgboost import Booster, XGBClassifier
 
-        if isinstance(self._model, Booster):
-            try:
+        try:
+            if isinstance(self._model, Booster):
                 return int(len(self._model.get_dump(dump_format="json")) / self._model.n_estimators)  # type: ignore
-            except AttributeError:
-                if nb_classes is not None:
-                    return nb_classes
-                raise NotImplementedError(
-                    "Number of classes cannot be determined automatically. "
-                    + "Please manually set argument nb_classes in XGBoostClassifier."
-                ) from AttributeError
+            if isinstance(self._model, XGBClassifier):
+                return self._model.n_classes_
+        except AttributeError:
+            # Attribute n_classes_ not found, will return default nb_classes value
+            pass
 
-        if isinstance(self._model, XGBClassifier):
-            return self._model.n_classes_
+        if nb_classes is not None:
+            return nb_classes
+        return None
 
-        return -1
-
-    def save(self, filename: str, path: Optional[str] = None) -> None:
+    def save(self, filename: str, path: str | None = None) -> None:
         """
         Save a model to file in the format specific to the backend framework.
 
@@ -193,7 +225,7 @@ class XGBoostClassifier(ClassifierDecisionTree):
         with open(full_path + ".pickle", "wb") as file_pickle:
             pickle.dump(self._model, file=file_pickle)
 
-    def get_trees(self) -> List["Tree"]:
+    def get_trees(self) -> list["Tree"]:
         """
         Get the decision trees.
 
@@ -222,10 +254,10 @@ class XGBoostClassifier(ClassifierDecisionTree):
 
         return trees
 
-    def _get_leaf_nodes(self, node, i_tree, class_label, box) -> List["LeafNode"]:
+    def _get_leaf_nodes(self, node, i_tree, class_label, box) -> list["LeafNode"]:
         from art.metrics.verification_decisions_trees import LeafNode, Box, Interval
 
-        leaf_nodes: List[LeafNode] = []
+        leaf_nodes: list[LeafNode] = []
 
         if "children" in node:
             if node["children"][0]["nodeid"] == node["yes"] and node["children"][1]["nodeid"] == node["no"]:

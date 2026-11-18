@@ -37,7 +37,7 @@ def fix_get_mnist_subset(get_mnist_dataset):
     yield x_train_mnist[:n_train], y_train_mnist[:n_train], x_test_mnist[:n_test], y_test_mnist[:n_test]
 
 
-@pytest.mark.skip_framework("keras", "scikitlearn", "mxnet", "kerastf")
+@pytest.mark.skip_framework("keras", "scikitlearn", "kerastf")
 @pytest.mark.parametrize("norm", [2, "inf"])
 def test_generate(art_warning, fix_get_mnist_subset, image_dl_estimator_for_attack, norm):
     try:
@@ -47,7 +47,7 @@ def test_generate(art_warning, fix_get_mnist_subset, image_dl_estimator_for_atta
             estimator=classifier, norm=norm, max_iter=5, eps=0.3, p_init=0.8, nb_restarts=1, verbose=False
         )
 
-        (x_train_mnist, y_train_mnist, x_test_mnist, y_test_mnist) = fix_get_mnist_subset
+        x_train_mnist, y_train_mnist, x_test_mnist, y_test_mnist = fix_get_mnist_subset
 
         x_train_mnist_adv = attack.generate(x=x_train_mnist, y=y_train_mnist)
 
@@ -57,6 +57,8 @@ def test_generate(art_warning, fix_get_mnist_subset, image_dl_estimator_for_atta
         elif norm == 2:
             expected_mean = 0.00073682
             expected_max = 0.25
+        else:
+            raise ValueError("Value of `norm` not recognized.")
 
         assert np.mean(np.abs(x_train_mnist_adv - x_train_mnist)) == pytest.approx(expected_mean, abs=0.025)
         assert np.max(np.abs(x_train_mnist_adv - x_train_mnist)) == pytest.approx(expected_max, abs=0.05)

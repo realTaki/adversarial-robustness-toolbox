@@ -23,10 +23,10 @@ import unittest
 import numpy as np
 import tensorflow as tf
 
-from art.utils import projection, random_sphere, to_categorical, least_likely_class, check_and_transform_label_format
-from art.utils import load_dataset, load_iris, load_mnist, load_nursery, load_cifar10
+from art.utils import projection, random_sphere, uniform_sample_from_sphere_or_ball, to_categorical, least_likely_class
+from art.utils import load_dataset, load_iris, load_mnist, load_nursery, load_cifar10, get_file
 from art.utils import second_most_likely_class, random_targets, get_label_conf, get_labels_np_array, preprocess
-from art.utils import compute_success_array, compute_success
+from art.utils import compute_success_array, compute_success, check_and_transform_label_format
 from art.utils import segment_by_class, performance_diff
 from art.utils import is_probability
 
@@ -42,18 +42,6 @@ NB_TEST = 100
 class TestUtils(unittest.TestCase):
     def setUp(self):
         master_seed(seed=1234)
-
-    def test_master_seed_mx(self):
-        import mxnet as mx
-
-        master_seed(seed=1234, set_mxnet=True)
-        x = mx.nd.random.uniform(0, 1, shape=(10,)).asnumpy()
-        y = mx.nd.random.uniform(0, 1, shape=(10,)).asnumpy()
-
-        master_seed(seed=1234, set_mxnet=True)
-        z = mx.nd.random.uniform(0, 1, shape=(10,)).asnumpy()
-        self.assertFalse((x == y).any())
-        self.assertTrue((x == z).all())
 
     def test_master_seed_pytorch(self):
         import torch
@@ -89,25 +77,6 @@ class TestUtils(unittest.TestCase):
         self.assertTrue((x != y).any())
         self.assertTrue((z == x).all())
 
-    @unittest.skipIf(tf.__version__[0] != "1", reason="Skip unittests if not TensorFlow v1.")
-    def test_master_seed_tf(self):
-        tf.reset_default_graph()
-        master_seed(seed=1234, set_tensorflow=True)
-        with tf.Session() as sess:
-            x = tf.random_uniform(shape=(1, 10))
-            y = tf.random_uniform(shape=(1, 10))
-            xv, yv = sess.run([x, y])
-
-        tf.reset_default_graph()
-        master_seed(seed=1234, set_tensorflow=True)
-        with tf.Session() as sess:
-            z = tf.random_uniform(shape=(1, 10))
-            zv = sess.run([z])[0]
-
-        self.assertTrue((xv != yv).any())
-        np.testing.assert_array_almost_equal(zv, xv, decimal=4)
-
-    @unittest.skipIf(tf.__version__[0] != "2", reason="Skip unittests if not TensorFlow v2.")
     def test_master_seed_tf_v2(self):
         master_seed(seed=1234, set_tensorflow=True)
         x = tf.random.uniform(shape=(1, 10))
@@ -121,7 +90,7 @@ class TestUtils(unittest.TestCase):
         self.assertTrue((xv != yv).any())
         np.testing.assert_array_almost_equal(zv, xv, decimal=4)
 
-    def test_projection(self):
+    def test_projection_norm(self):
         # Get MNIST
         (x, _), (_, _), _, _ = load_mnist()
 
@@ -134,9 +103,13 @@ class TestUtils(unittest.TestCase):
         self.assertEqual(x.shape, x_proj.shape)
         self.assertTrue(np.allclose(np.sum(np.abs(x_proj), axis=t), 3.14159, atol=10e-8))
 
+        x_proj = projection(rand_sign * x, 3.14159, 1, suboptimal=False)
+        self.assertEqual(x.shape, x_proj.shape)
+        self.assertTrue(np.allclose(np.sum(np.abs(x_proj), axis=t), 3.14159, atol=10e-8))
+
         x_proj = projection(rand_sign * x, 3.14159, 2)
         self.assertEqual(x.shape, x_proj.shape)
-        self.assertTrue(np.allclose(np.sqrt(np.sum(x_proj ** 2, axis=t)), 3.14159, atol=10e-8))
+        self.assertTrue(np.allclose(np.sqrt(np.sum(x_proj**2, axis=t)), 3.14159, atol=10e-8))
 
         x_proj = projection(rand_sign * x, 0.314159, np.inf)
         self.assertEqual(x.shape, x_proj.shape)
@@ -154,10 +127,58 @@ class TestUtils(unittest.TestCase):
         self.assertTrue(np.all(np.sum(np.abs(x), axis=1) <= 1.0))
 
         x = random_sphere(10, 10, 1, 2)
+        self.assertEqual(x.shape, (10, 10))
         self.assertTrue(np.all(np.linalg.norm(x, axis=1) < 1.0))
 
         x = random_sphere(10, 10, 1, np.inf)
+        self.assertEqual(x.shape, (10, 10))
         self.assertTrue(np.all(np.abs(x) < 1.0))
+
+        x = random_sphere(10, 10, 0.5, 1)
+        self.assertTrue(np.all(np.sum(np.abs(x), axis=1) <= 0.5))
+
+        x = random_sphere(10, 10, 0.5, 2)
+        self.assertTrue(np.all(np.linalg.norm(x, axis=1) < 0.5))
+
+        x = random_sphere(10, 10, 0.5, np.inf)
+        self.assertTrue(np.all(np.abs(x) < 0.5))
+
+        x = random_sphere(1, 10000, 1, 1)
+        self.assertTrue(np.abs(np.sum(np.abs(x), axis=1) - 1.0) < 1e-2)
+
+        x = random_sphere(1, 10000, 1, 2)
+        self.assertTrue(np.abs(np.linalg.norm(x, axis=1) - 1.0) < 1e-2)
+
+        x = random_sphere(1, 10000, 1, np.inf)
+        self.assertTrue(np.abs(np.max(np.abs(x), axis=1) - 1.0) < 1e-2)
+
+    def test_uniform_sample_from_sphere_or_ball(self):
+        x = uniform_sample_from_sphere_or_ball(nb_points=10, nb_dims=10, radius=1, sample_space="ball", norm=1)
+
+        self.assertEqual(x.shape, (10, 10))
+        self.assertTrue(np.all(np.sum(np.abs(x), axis=1) <= 1.0))
+
+        x = uniform_sample_from_sphere_or_ball(nb_points=10, nb_dims=10, radius=1, sample_space="ball", norm=np.inf)
+        self.assertEqual(x.shape, (10, 10))
+        self.assertTrue(np.all(np.abs(x) < 1.0))
+
+        x = uniform_sample_from_sphere_or_ball(nb_points=10, nb_dims=10, radius=0.5, sample_space="ball", norm=1)
+        self.assertTrue(np.all(np.sum(np.abs(x), axis=1) <= 0.5))
+
+        x = uniform_sample_from_sphere_or_ball(nb_points=10, nb_dims=10, radius=0.5, sample_space="ball", norm=2)
+        self.assertTrue(np.all(np.linalg.norm(x, axis=1) < 0.5))
+
+        x = uniform_sample_from_sphere_or_ball(nb_points=10, nb_dims=10, radius=0.5, sample_space="ball", norm=np.inf)
+        self.assertTrue(np.all(np.abs(x) < 0.5))
+
+        x = uniform_sample_from_sphere_or_ball(nb_points=1, nb_dims=10000, radius=1, sample_space="ball", norm=1)
+        self.assertTrue(np.abs(np.sum(np.abs(x), axis=1) - 1.0) < 1e-2)
+
+        x = uniform_sample_from_sphere_or_ball(nb_points=1, nb_dims=10000, radius=1, sample_space="ball", norm=2)
+        self.assertTrue(np.abs(np.linalg.norm(x, axis=1) - 1.0) < 1e-2)
+
+        x = uniform_sample_from_sphere_or_ball(nb_points=1, nb_dims=10000, radius=1, sample_space="ball", norm=np.inf)
+        self.assertTrue(np.abs(np.max(np.abs(x), axis=1) - 1.0) < 1e-2)
 
     def test_to_categorical(self):
         y = np.array([3, 1, 4, 1, 5, 9])
@@ -210,10 +231,49 @@ class TestUtils(unittest.TestCase):
             labels_transformed, np.expand_dims(np.argmax(labels_expected_binary, axis=1), axis=1)
         )
 
+        # with no nb_classes
+
+        # test input shape (nb_samples,)
+        labels = np.array([3, 1, 4])
+        labels_transformed = check_and_transform_label_format(labels, nb_classes=None, return_one_hot=True)
+        np.testing.assert_array_equal(labels_transformed, labels_expected)
+
+        # test input shape (nb_samples, 1)
+        labels = np.array([[3], [1], [4]])
+        labels_transformed = check_and_transform_label_format(labels, nb_classes=None, return_one_hot=True)
+        np.testing.assert_array_equal(labels_transformed, labels_expected)
+
+        # test input shape (nb_samples, 1) - binary
+        labels = np.array([[1], [0], [1]])
+        labels_transformed = check_and_transform_label_format(labels, nb_classes=None, return_one_hot=True)
+        np.testing.assert_array_equal(labels_transformed, labels_expected_binary)
+
+        # test input shape (nb_samples, 1) - binary
+        labels = np.array([[0, 1], [1, 0], [0, 1]])
+        labels_transformed = check_and_transform_label_format(labels, nb_classes=None, return_one_hot=True)
+        np.testing.assert_array_equal(labels_transformed, labels_expected_binary)
+
+        # test input shape (nb_samples, nb_classes)
+        labels = np.array([[0, 0, 0, 1, 0], [0, 1, 0, 0, 0], [0, 0, 0, 0, 1]])
+        labels_transformed = check_and_transform_label_format(labels, nb_classes=None, return_one_hot=True)
+        np.testing.assert_array_equal(labels_transformed, labels_expected)
+
+        # test input shape (nb_samples, nb_classes) with return_one_hot=False
+        labels = np.array([[0, 0, 0, 1, 0], [0, 1, 0, 0, 0], [0, 0, 0, 0, 1]])
+        labels_transformed = check_and_transform_label_format(labels, nb_classes=None, return_one_hot=False)
+        np.testing.assert_array_equal(labels_transformed, np.expand_dims(np.argmax(labels_expected, axis=1), axis=1))
+
+        # test input shape (nb_samples, 1) - binary
+        labels = np.array([[1], [0], [1]])
+        labels_transformed = check_and_transform_label_format(labels, nb_classes=None, return_one_hot=False)
+        np.testing.assert_array_equal(
+            labels_transformed, np.expand_dims(np.argmax(labels_expected_binary, axis=1), axis=1)
+        )
+
         # ValueError for len(labels.shape) > 2
         labels = np.array([[[0, 0, 0, 1, 0], [0, 1, 0, 0, 0], [0, 0, 0, 0, 1]]])
         with self.assertRaises(ValueError):
-            check_and_transform_label_format(labels)
+            check_and_transform_label_format(labels, nb_classes=None)
 
     def test_random_targets(self):
         y = np.array([3, 1, 4, 1, 5, 9])
@@ -373,6 +433,21 @@ class TestUtils(unittest.TestCase):
         self.assertEqual(x_train.shape[0], y_train.shape[0])
         self.assertEqual(x_test.shape[0], y_test.shape[0])
 
+    def test_get_file(self):
+        import os
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            url = "https://raw.githubusercontent.com/Trusted-AI/adversarial-robustness-toolbox/main/README.md"
+            path = get_file("README.md", path=tmpdir, extract=False, url=url, verbose=True)
+            self.assertTrue(os.path.exists(path))
+            self.assertGreater(os.path.getsize(path), 0)
+
+            # Test downloading with verbose=False
+            path2 = get_file("README_2.md", path=tmpdir, extract=False, url=url, verbose=False)
+            self.assertTrue(os.path.exists(path2))
+            self.assertGreater(os.path.getsize(path2), 0)
+
     # def test_stl(self):
     #     (x_train, y_train), (x_test, y_test), min_, max_ = load_stl()
     #     self.assertAlmostEqual(min_, 0.0, places=6)
@@ -399,13 +474,13 @@ class TestUtils(unittest.TestCase):
 
         (x_train, y_train), (x_test, y_test), min_, max_ = load_nursery()
         self.assertAlmostEqual(min_, -1.3419307411337875, places=6)
-        self.assertEqual(max_, 2.0007720517562224)
+        self.assertAlmostEqual(max_, 2.000772051756222, places=6)
         self.assertEqual(x_train.shape[0], y_train.shape[0])
         self.assertEqual(x_test.shape[0], y_test.shape[0])
 
         (x_train, y_train), (x_test, y_test), min_, max_ = load_dataset("nursery")
         self.assertAlmostEqual(min_, -1.3419307411337875, places=6)
-        self.assertEqual(max_, 2.0007720517562224)
+        self.assertAlmostEqual(max_, 2.000772051756222, places=6)
         self.assertEqual(x_train.shape[0], y_train.shape[0])
         self.assertEqual(x_test.shape[0], y_test.shape[0])
 

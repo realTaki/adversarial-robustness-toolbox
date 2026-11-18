@@ -20,7 +20,10 @@ This module implements the evaluation of Security Curves.
 
 Examples of Security Curves can be found in Figure 6 of Madry et al., 2017 (https://arxiv.org/abs/1706.06083).
 """
-from typing import List, Optional, Tuple, TYPE_CHECKING, Union
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -38,7 +41,7 @@ class SecurityCurve(Evaluation):
     Examples of Security Curves can be found in Figure 6 of Madry et al., 2017 (https://arxiv.org/abs/1706.06083).
     """
 
-    def __init__(self, eps: Union[int, List[float], List[int]]):
+    def __init__(self, eps: int | list[float] | list[int]):
         """
         Create an instance of a Security Curve evaluation.
 
@@ -46,18 +49,17 @@ class SecurityCurve(Evaluation):
         """
 
         self.eps = eps
-        self.eps_list: List[float] = []
-        self.accuracy_adv_list: List[float] = []
-        self.accuracy: Optional[float] = None
+        self.eps_list: list[float] = []
+        self.accuracy_adv_list: list[float] = []
+        self.accuracy: float | None = None
 
-    # pylint: disable=W0221
     def evaluate(  # type: ignore
         self,
         classifier: "CLASSIFIER_LOSS_GRADIENTS_TYPE",
         x: np.ndarray,
         y: np.ndarray,
-        **kwargs: Union[str, bool, int, float],
-    ) -> Tuple[List[float], List[float], float]:
+        **kwargs: str | bool | int | float,
+    ) -> tuple[list[float], list[float], float]:
         """
         Evaluate the Security Curve of a classifier using Projected Gradient Descent.
 
@@ -66,7 +68,7 @@ class SecurityCurve(Evaluation):
         :param y: True labels for input data `x`.
         :param kwargs: Keyword arguments for the Projected Gradient Descent attack used for evaluation, except keywords
                        `classifier` and `eps`.
-        :return: List of evaluated `eps` values, List of adversarial accuracies, and benign accuracy.
+        :return: List of evaluated `eps` values, list of adversarial accuracies, and benign accuracy.
         """
 
         kwargs.pop("classifier", None)
@@ -78,9 +80,9 @@ class SecurityCurve(Evaluation):
         # Check type of eps
         if isinstance(self.eps, int):
             if classifier.clip_values is not None:
-                eps_increment = (classifier.clip_values[1] - classifier.clip_values[0]) / self.eps
+                eps_increment = float(classifier.clip_values[1] - classifier.clip_values[0]) / self.eps
             else:
-                eps_increment = (np.max(x) - np.min(x)) / self.eps
+                eps_increment = float(np.max(x) - np.min(x)) / self.eps
 
             for i in range(1, self.eps + 1):
                 self.eps_list.append(float(i * eps_increment))
@@ -119,7 +121,7 @@ class SecurityCurve(Evaluation):
         classifier: "CLASSIFIER_LOSS_GRADIENTS_TYPE",
         x: np.ndarray,
         y: np.ndarray,
-        **kwargs: Union[str, bool, int, float],
+        **kwargs: str | bool | int | float,
     ) -> None:
         """
         Check if potential gradient obfuscation can be detected. Projected Gradient Descent with 100 iterations is run
@@ -164,7 +166,12 @@ class SecurityCurve(Evaluation):
         from matplotlib import pyplot as plt
 
         plt.plot(self.eps_list, self.accuracy_adv_list, label="adversarial", marker="o")
-        plt.plot([self.eps_list[0], self.eps_list[-1]], [self.accuracy, self.accuracy], linestyle="--", label="benign")
+        plt.plot(
+            [self.eps_list[0], self.eps_list[-1]],  # type: ignore
+            [self.accuracy, self.accuracy],  # type: ignore
+            linestyle="--",
+            label="benign",
+        )
         plt.legend()
         plt.xlabel("Attack budget eps")
         plt.ylabel("Accuracy")
@@ -172,7 +179,7 @@ class SecurityCurve(Evaluation):
             plt.title("Potential gradient obfuscation detected.")
         else:
             plt.title("No gradient obfuscation detected")
-        plt.ylim([0, 1.05])
+        plt.ylim(0, 1.05)
         plt.show()
 
     @staticmethod

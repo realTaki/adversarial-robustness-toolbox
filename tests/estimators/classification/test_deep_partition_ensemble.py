@@ -69,90 +69,63 @@ class TestDeepPartitionEnsemble(unittest.TestCase):
         Test with a TensorFlow Classifier.
         :return:
         """
-        tf_version = list(map(int, tf.__version__.lower().split("+")[0].split(".")))
-        if tf_version[0] == 2:
+        # Get MNIST
+        (x_train, y_train), (x_test, y_test) = self.mnist
 
-            # Get MNIST
-            (x_train, y_train), (x_test, y_test) = self.mnist
+        # Create a model from scratch
+        from tensorflow.keras import Model
+        from tensorflow.keras.layers import Dense, Flatten, Conv2D, MaxPool2D, Input
 
-            # Create a model from scratch
-            from tensorflow.keras import Model
-            from tensorflow.keras.layers import Dense, Flatten, Conv2D, MaxPool2D
+        def build_tensorflow_functional_model():
+            inputs = Input(shape=(28, 28, 1))
 
-            class TensorFlowModel(Model):
-                """
-                Standard TensorFlow model for unit testing.
-                """
+            x = Conv2D(filters=4, kernel_size=5, activation="relu")(inputs)
+            x = MaxPool2D(pool_size=(2, 2), strides=(2, 2))(x)
+            x = Conv2D(filters=10, kernel_size=5, activation="relu")(x)
+            x = MaxPool2D(pool_size=(2, 2), strides=(2, 2))(x)
+            x = Flatten()(x)
+            x = Dense(100, activation="relu")(x)
+            outputs = Dense(10, activation="linear")(x)
 
-                def __init__(self):
-                    super(TensorFlowModel, self).__init__()
-                    self.conv1 = Conv2D(filters=4, kernel_size=5, activation="relu")
-                    self.conv2 = Conv2D(filters=10, kernel_size=5, activation="relu")
-                    self.maxpool = MaxPool2D(pool_size=(2, 2), strides=(2, 2), padding="valid", data_format=None)
-                    self.flatten = Flatten()
-                    self.dense1 = Dense(100, activation="relu")
-                    self.logits = Dense(10, activation="linear")
+            return Model(inputs=inputs, outputs=outputs, name="TensorFlowModel")
 
-                def call(self, x):
-                    """
-                    Call function to evaluate the model.
+        model = build_tensorflow_functional_model()
+        loss_object = tf.keras.losses.CategoricalCrossentropy(from_logits=True)
+        optimizer = Adam(learning_rate=0.01)
+        model.compile(loss=loss_object, optimizer=optimizer)
 
-                    :param x: Input to the model
-                    :return: Prediction of the model
-                    """
-                    x = self.conv1(x)
-                    x = self.maxpool(x)
-                    x = self.conv2(x)
-                    x = self.maxpool(x)
-                    x = self.flatten(x)
-                    x = self.dense1(x)
-                    x = self.logits(x)
-                    return x
+        classifier = TensorFlowV2Classifier(
+            model=model,
+            loss_object=loss_object,
+            optimizer=optimizer,
+            nb_classes=10,
+            input_shape=(28, 28, 1),
+            clip_values=(0, 1),
+        )
 
-            optimizer = Adam(learning_rate=0.01)
+        # Initialize DPA Classifier
+        dpa = DeepPartitionEnsemble(
+            classifiers=classifier,
+            ensemble_size=ENSEMBLE_SIZE,
+            channels_first=classifier.channels_first,
+            clip_values=classifier.clip_values,
+            preprocessing_defences=classifier.preprocessing_defences,
+            postprocessing_defences=classifier.postprocessing_defences,
+            preprocessing=classifier.preprocessing,
+        )
 
-            def train_step(model, images, labels):
-                with tf.GradientTape() as tape:
-                    predictions = model(images, training=True)
-                    loss = loss_object(labels, predictions)
-                gradients = tape.gradient(loss, model.trainable_variables)
-                optimizer.apply_gradients(zip(gradients, model.trainable_variables))
+        # Check basic functionality of DPA Classifier
+        # check predict
+        y_test_dpa = dpa.predict(x=x_test)
+        self.assertEqual(y_test_dpa.shape, y_test.shape)
+        self.assertTrue((np.sum(y_test_dpa, axis=1) <= ENSEMBLE_SIZE * np.ones((NB_TEST,))).all())
 
-            model = TensorFlowModel()
-            loss_object = tf.keras.losses.CategoricalCrossentropy(from_logits=True)
+        # loss gradient
+        grad = dpa.loss_gradient(x=x_test, y=y_test, sampling=True)
+        assert grad.shape == (10, 28, 28, 1)
 
-            classifier = TensorFlowV2Classifier(
-                model=model,
-                loss_object=loss_object,
-                train_step=train_step,
-                nb_classes=10,
-                input_shape=(28, 28, 1),
-                clip_values=(0, 1),
-            )
-
-            # Initialize DPA Classifier
-            dpa = DeepPartitionEnsemble(
-                classifiers=classifier,
-                ensemble_size=ENSEMBLE_SIZE,
-                channels_first=classifier.channels_first,
-                clip_values=classifier.clip_values,
-                preprocessing_defences=classifier.preprocessing_defences,
-                postprocessing_defences=classifier.postprocessing_defences,
-                preprocessing=classifier.preprocessing,
-            )
-
-            # Check basic functionality of DPA Classifier
-            # check predict
-            y_test_dpa = dpa.predict(x=x_test)
-            self.assertEqual(y_test_dpa.shape, y_test.shape)
-            self.assertTrue((np.sum(y_test_dpa, axis=1) <= ENSEMBLE_SIZE * np.ones((NB_TEST,))).all())
-
-            # loss gradient
-            grad = dpa.loss_gradient(x=x_test, y=y_test, sampling=True)
-            assert grad.shape == (10, 28, 28, 1)
-
-            # fit
-            dpa.fit(x=x_train, y=y_train)
+        # fit
+        dpa.fit(x=x_train, y=y_train)
 
     def test_2_pt(self):
         """
@@ -230,8 +203,6 @@ class TestDeepPartitionEnsemble(unittest.TestCase):
         Test with a Keras Classifier.
         :return:
         """
-        tf.compat.v1.disable_eager_execution()
-
         # Get MNIST
         (x_train, y_train), (x_test, y_test) = self.mnist
 

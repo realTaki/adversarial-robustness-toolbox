@@ -19,10 +19,10 @@
 This module implements membership inference attacks.
 """
 
-from __future__ import absolute_import, division, print_function, unicode_literals
+from __future__ import absolute_import, division, print_function, unicode_literals, annotations
 
 import logging
-from typing import Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -56,7 +56,7 @@ class MembershipInferenceBlackBoxRuleBased(MembershipInferenceAttack):
         """
         super().__init__(estimator=classifier)
 
-    def infer(self, x: np.ndarray, y: Optional[np.ndarray] = None, **kwargs) -> np.ndarray:
+    def infer(self, x: np.ndarray, y: np.ndarray | None = None, **kwargs) -> np.ndarray:
         """
         Infer membership in the training set of the target estimator.
 
@@ -79,7 +79,7 @@ class MembershipInferenceBlackBoxRuleBased(MembershipInferenceAttack):
         else:
             probabilities = False
 
-        y = check_and_transform_label_format(y, len(np.unique(y)), return_one_hot=True)
+        y = check_and_transform_label_format(y, nb_classes=len(np.unique(y)), return_one_hot=True)
         if y is None:
             raise ValueError("None value detected.")
         if y.shape[0] != x.shape[0]:  # pragma: no cover
@@ -97,7 +97,7 @@ class MembershipInferenceBlackBoxRuleBased(MembershipInferenceAttack):
                 prob[:, np.ones_like(predicted_class) - predicted_class] = np.ones_like(pred_prob) - pred_prob
             else:
                 # simply returns probability 1 for the predicted class and 0 for the other class
-                prob_none = check_and_transform_label_format(predicted_class, return_one_hot=True)
+                prob_none = check_and_transform_label_format(predicted_class, nb_classes=2, return_one_hot=True)
                 if prob_none is not None:
                     prob = prob_none
             return prob

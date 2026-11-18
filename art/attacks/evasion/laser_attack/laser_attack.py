@@ -21,8 +21,12 @@ This module implements the `LaserAttack` attack.
 | Paper link: https://arxiv.org/abs/2103.06504
 """
 
+from __future__ import annotations
+
+from collections.abc import Callable
 import logging
-from typing import Callable, List, Optional, Tuple, Union, Any
+import math
+from typing import Any
 
 import numpy as np
 
@@ -63,7 +67,7 @@ class LaserAttack(EvasionAttack):
         image_generator: ImageGenerator = ImageGenerator(),
         random_initializations: int = 1,
         optimisation_algorithm: Callable = greedy_search,
-        debug: Optional[DebugInfo] = None,
+        debug: DebugInfo | None = None,
     ) -> None:
         """
         :param estimator: Predictor of the image class.
@@ -85,7 +89,7 @@ class LaserAttack(EvasionAttack):
 
         self._check_params()
 
-    def generate(self, x: np.ndarray, y: Optional[np.ndarray] = None, **kwargs) -> np.ndarray:
+    def generate(self, x: np.ndarray, y: np.ndarray | None = None, **kwargs) -> np.ndarray:
         """
         Generate adversarial examples.
 
@@ -112,8 +116,8 @@ class LaserAttack(EvasionAttack):
     def generate_parameters(
         self,
         x: np.ndarray,
-        y: Optional[np.ndarray] = None,
-    ) -> List[Tuple[Optional[AdversarialObject], Optional[int]]]:
+        y: np.ndarray | None = None,
+    ) -> list[tuple[AdversarialObject | None, int | None]]:
         """
         Generate adversarial parameters for given images.
 
@@ -130,8 +134,8 @@ class LaserAttack(EvasionAttack):
         return result
 
     def _generate_params_for_single_input(
-        self, x: np.ndarray, y: Optional[int] = None
-    ) -> Tuple[Optional[AdversarialObject], Optional[int]]:
+        self, x: np.ndarray, y: int | None = None
+    ) -> tuple[AdversarialObject | None, int | None]:
         """
         Generate adversarial example params for a single image.
 
@@ -168,7 +172,7 @@ class LaserAttack(EvasionAttack):
 
     def _attack_single_image(
         self, x: np.ndarray, y: int, confidence: float
-    ) -> Tuple[Optional[AdversarialObject], Optional[int]]:
+    ) -> tuple[AdversarialObject | None, int | None]:
         """
         Attack particular image with given class.
 
@@ -219,7 +223,7 @@ class LaserBeam(AdversarialObject):
         if distance <= self.width / 2.0:
             return self.rgb
         if self.width / 2.0 <= distance <= 5 * self.width:
-            return np.math.sqrt(self.width) / np.math.pow(distance, 2) * self.rgb  # type: ignore
+            return math.sqrt(self.width) / math.pow(distance, 2) * self.rgb  # type: ignore
 
         return np.array([0.0, 0.0, 0.0])
 
@@ -229,7 +233,7 @@ class LaserBeam(AdversarialObject):
     @staticmethod
     def from_numpy(theta: np.ndarray) -> "LaserBeam":
         """
-        :param theta: List of the laser beam parameters, passed as List int the order:
+        :param theta: List of the laser beam parameters, passed as list in the order:
             wavelength[nm], slope angle[radians], bias[pixels], width[pixels].
         :returns: New class object based on :theta.
         """
@@ -240,11 +244,11 @@ class LaserBeam(AdversarialObject):
         )
 
     @staticmethod
-    def from_array(theta: List) -> "LaserBeam":
+    def from_array(theta: list) -> "LaserBeam":
         """
         Create instance of the class using parameters :theta.
 
-        :param theta: List of the laser beam parameters, passed as List int the order:
+        :param theta: List of the laser beam parameters, passed as list in the order:
             wavelength[nm], slope angle[radians], bias[pixels], width[pixels].
         :returns: New class object based on :theta.
         """
@@ -258,7 +262,7 @@ class LaserBeam(AdversarialObject):
         line = self.line
         return np.array([self.wavelength, line.angle, line.bias, self.width])
 
-    def __mul__(self, other: Union[float, int, list, np.ndarray]) -> "LaserBeam":
+    def __mul__(self, other: float | int | list | np.ndarray) -> "LaserBeam":
         if isinstance(other, (float, int)):
             return LaserBeam.from_numpy(other * self.to_numpy())
         if isinstance(other, np.ndarray):
@@ -309,7 +313,7 @@ class LaserBeamGenerator(AdvObjectGenerator):
 
         :returns: Random array of ones (mask).
         """
-        q_mask = np.asfarray(
+        q_mask = np.asarray(
             [
                 [1, 0, 0, 0],
                 [0, 1, 0, 0],
@@ -321,7 +325,8 @@ class LaserBeamGenerator(AdvObjectGenerator):
                 [0, 1, 1, 0],
                 [0, 1, 0, 1],
                 [0, 0, 1, 1],
-            ]
+            ],
+            dtype=float,
         )
 
         mask = q_mask[np.random.choice(len(q_mask))]
@@ -336,6 +341,7 @@ class LaserBeamGenerator(AdvObjectGenerator):
         """
         clipped_params = np.clip(params.to_numpy(), self.min_params.to_numpy(), self.max_params.to_numpy())
         params.wavelength = clipped_params[0]
+        params.rgb = np.array(wavelength_to_rgb(params.wavelength))
         params.line.angle = clipped_params[1]
         params.line.bias = clipped_params[2]
         params.width = clipped_params[3]
@@ -365,11 +371,11 @@ class LaserBeamAttack(LaserAttack):
         self,
         estimator,
         iterations: int,
-        max_laser_beam: Union[LaserBeam, Tuple[float, float, float, int]],
-        min_laser_beam: Union[LaserBeam, Tuple[float, float, float, int]] = (380.0, 0.0, 1.0, 1),
+        max_laser_beam: LaserBeam | tuple[float, float, float, int],
+        min_laser_beam: LaserBeam | tuple[float, float, float, int] = (380.0, 0.0, 1.0, 1),
         random_initializations: int = 1,
         image_generator: ImageGenerator = ImageGenerator(),
-        debug: Optional[DebugInfo] = None,
+        debug: DebugInfo | None = None,
     ) -> None:
         """
         :param estimator: Predictor of the image class.

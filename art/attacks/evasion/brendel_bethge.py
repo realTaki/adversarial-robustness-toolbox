@@ -42,8 +42,12 @@
 """
 This module implements Brendel and Bethge attack.
 """
-# pylint: disable=C0103,R0201,C0115,C0116,C0144,C0302,W0612,W0613,E1120,R1716,R1705,R1723,R1720
-from typing import Union, Optional, Tuple, TYPE_CHECKING
+
+from __future__ import annotations
+
+# pylint: disable=invalid-name,missing-class-docstring,missing-function-docstring,old-non-ascii-name,unused-variable
+# pylint: disable=unused-argument,chained-comparison,no-else-return,no-else-break,no-else-raise
+from typing import TYPE_CHECKING
 import logging
 
 import numpy as np
@@ -115,15 +119,9 @@ class BFGSB:  # pragma: no cover
             qk1 = self._subspace_min(qk, var_l, u, x_cp, _gfk.copy(), Hk)
             pk = qk1 - qk
 
-            (
-                alpha_k,
-                fc,
-                gc,
-                old_fval,
-                old_old_fval,
-                gfkp1,
-                fnev,
-            ) = self._line_search_wolfe(fun_and_jac, qk, pk, _gfk, old_fval, old_old_fval, var_l, u, args)
+            alpha_k, fc, gc, old_fval, old_old_fval, gfkp1, fnev = self._line_search_wolfe(
+                fun_and_jac, qk, pk, _gfk, old_fval, old_old_fval, var_l, u, args
+            )
             func_calls += fnev
 
             if alpha_k is None:
@@ -258,7 +256,7 @@ class BFGSB:  # pragma: no cover
                     if dk * alpha < temp2:
                         temp1 = temp2 / dk
                     else:
-                        temp2 = u[i] - x_cp[i]  # lgtm [py/multiple-definition]
+                        temp2 = u[i] - x_cp[i]
             else:
                 temp2 = u[i] - x_cp[i]
                 if temp1 <= 0:
@@ -336,6 +334,10 @@ class BFGSB:  # pragma: no cover
         For the zoom phase it uses an algorithm by
         Outputs: (alpha0, gc, fc)
         """
+        alpha_star = 0.0
+        fval_star = 0.0
+        fprime_star = None
+
         c1 = 1e-4
         c2 = 0.9
         N = xk.shape[0]
@@ -398,7 +400,7 @@ class BFGSB:  # pragma: no cover
                 while 1:
                     # interpolate to find a trial step length between a_lo and a_hi
                     # Need to choose interpolation here.  Use cubic interpolation and then if the
-                    #  result is within delta * dalpha or outside of the interval bounded by a_lo or a_hi
+                    #  result is within delta * dalpha or outside the interval bounded by a_lo or a_hi
                     #  then use quadratic interpolation, if the result is still too close, then use bisection
 
                     dalpha = a_hi - a_lo
@@ -507,7 +509,7 @@ class BFGSB:  # pragma: no cover
                 while 1:
                     # interpolate to find a trial step length between a_lo and a_hi
                     # Need to choose interpolation here.  Use cubic interpolation and then if the
-                    #  result is within delta * dalpha or outside of the interval bounded by a_lo or a_hi
+                    #  result is within delta * dalpha or outside the interval bounded by a_lo or a_hi
                     #  then use quadratic interpolation, if the result is still too close, then use bisection
 
                     dalpha = a_hi - a_lo
@@ -609,8 +611,8 @@ class BFGSB:  # pragma: no cover
         if (db == 0) or (dc == 0) or (b == c):
             return None
         denom = (db * dc) ** 2 * (db - dc)
-        A = dc ** 2 * (fb - fa - C * db) - db ** 2 * (fc - fa - C * dc)
-        B = -(dc ** 3) * (fb - fa - C * db) + db ** 3 * (fc - fa - C * dc)
+        A = dc**2 * (fb - fa - C * db) - db**2 * (fc - fa - C * dc)
+        B = -(dc**3) * (fb - fa - C * db) + db**3 * (fc - fa - C * dc)
 
         A /= denom
         B /= denom
@@ -660,10 +662,10 @@ class Optimizer:  # pragma: no cover
         if np.abs(cmax) < np.abs(c):
             # problem not solvable (boundary cannot be reached)
             if np.sqrt(cmaxnorm) < r:
-                # make largest possible step towards boundary while staying within bounds
+                # make the largest possible step towards boundary while staying within bounds
                 _delta = self.optimize_boundary_s_t_trustregion(x0, x, b, min_, max_, c, r)
             else:
-                # make largest possible step towards boundary while staying within trust region
+                # make the largest possible step towards boundary while staying within trust region
                 _delta = self.optimize_boundary_s_t_trustregion(x0, x, b, min_, max_, c, r)
         else:
             if cmaxnorm < r:
@@ -680,7 +682,7 @@ class Optimizer:  # pragma: no cover
                     _delta = self.optimize_distance_s_t_boundary_and_trustregion(x0, x, b, min_, max_, c, r)
                 else:
                     # problem not solvable (boundary cannot be reached)
-                    # make largest step towards boundary within trust region
+                    # make the largest step towards boundary within trust region
                     _delta = self.optimize_boundary_s_t_trustregion(x0, x, b, min_, max_, c, r)
 
         return _delta
@@ -719,7 +721,7 @@ class Optimizer:  # pragma: no cover
 
             min ||delta||_2^2 s.t. lower <= x + delta <= upper AND b.dot(delta) = c
 
-        Lets forget about the box constraints for a second, i.e.
+        Let's forget about the box constraints for a second, i.e.
 
             min ||delta||_2^2 s.t. b.dot(delta) = c
 
@@ -744,7 +746,7 @@ class Optimizer:  # pragma: no cover
         """
         N = x.shape[0]
 
-        lambda_lower = 2 * c / (bnorm ** 2 + EPS)
+        lambda_lower = 2 * c / (bnorm**2 + EPS)
         lambda_upper = np.sign(c) * np.inf  # optimal initial point (if box-constraints are neglected)
         _lambda = lambda_lower
         k = 0
@@ -763,12 +765,12 @@ class Optimizer:  # pragma: no cover
                         max_step = _u - x[n]
                         delta_step = min(max_step, lam_step)
                         _c += b[n] * delta_step
-                        norm += delta_step ** 2
+                        norm += delta_step**2
                     else:
                         max_step = _ell - x[n]
                         delta_step = max(max_step, lam_step)
                         _c += b[n] * delta_step
-                        norm += delta_step ** 2
+                        norm += delta_step**2
             else:
                 for n in range(N):
                     lam_step = _lambda * b[n] / 2
@@ -776,12 +778,12 @@ class Optimizer:  # pragma: no cover
                         max_step = _ell - x[n]
                         delta_step = max(max_step, lam_step)
                         _c += b[n] * delta_step
-                        norm += delta_step ** 2
+                        norm += delta_step**2
                     else:
                         max_step = _u - x[n]
                         delta_step = min(max_step, lam_step)
                         _c += b[n] * delta_step
-                        norm += delta_step ** 2
+                        norm += delta_step**2
 
             # adjust lambda
             if np.abs(_c) < np.abs(c):
@@ -821,8 +823,8 @@ class Optimizer:  # pragma: no cover
         _mu = params[0]
         t = 1 / (2 * _mu + EPS)
 
-        g = -_mu * r ** 2
-        grad_mu = -(r ** 2)
+        g = -_mu * r**2
+        grad_mu = -(r**2)
 
         for n in range(N):
             d = -s * b[n] * t
@@ -832,9 +834,9 @@ class Optimizer:  # pragma: no cover
             elif d > max_ - x[n]:
                 d = max_ - x[n]
             else:
-                grad_mu += (b[n] + 2 * _mu * d) * (b[n] / (2 * _mu ** 2 + EPS))
+                grad_mu += (b[n] + 2 * _mu * d) * (b[n] / (2 * _mu**2 + EPS))
 
-            grad_mu += d ** 2
+            grad_mu += d**2
             g += (b[n] + _mu * d) * d
 
         return -g, -np.array([grad_mu])
@@ -1035,15 +1037,15 @@ class L2Optimizer(Optimizer):  # pragma: no cover
 
             distance += (d - dx) ** 2
             b_dot_d += bn * d
-            d_norm += d ** 2
+            d_norm += d**2
 
-            g += (dx - d) ** 2 + mu * d ** 2 + lam * bn * d
+            g += (dx - d) ** 2 + mu * d**2 + lam * bn * d
             d_g_d_lam += bn * d
-            d_g_d_mu += d ** 2
+            d_g_d_mu += d**2
 
-        g += -mu * r ** 2 - lam * c
+        g += -mu * r**2 - lam * c
         d_g_d_lam -= c
-        d_g_d_mu -= r ** 2
+        d_g_d_mu -= r**2
 
         return -g, -np.array([d_g_d_lam, d_g_d_mu])
 
@@ -1102,9 +1104,9 @@ class L1Optimizer(Optimizer):  # pragma: no cover
                         d_g_d_lam -= prefac * bn * t
                         d_g_d_mu -= prefac * 2 * d * t
 
-                g += np.abs(dx - d) + mu * d ** 2 + lam * bn * d
+                g += np.abs(dx - d) + mu * d**2 + lam * bn * d
                 d_g_d_lam += bn * d
-                d_g_d_mu += d ** 2
+                d_g_d_mu += d**2
         else:  # mu == 0
             for n in range(N):
                 dx = x0[n] - x[n]
@@ -1116,13 +1118,13 @@ class L1Optimizer(Optimizer):  # pragma: no cover
                 else:
                     d = min_ - x[n]
 
-                g += np.abs(dx - d) + mu * d ** 2 + lam * bn * d
+                g += np.abs(dx - d) + mu * d**2 + lam * bn * d
                 d_g_d_lam += bn * d
-                d_g_d_mu += d ** 2
+                d_g_d_mu += d**2
 
-        g += -mu * r ** 2 - lam * c
+        g += -mu * r**2 - lam * c
         d_g_d_lam -= c
-        d_g_d_mu -= r ** 2
+        d_g_d_mu -= r**2
 
         return -g, -np.array([d_g_d_lam, d_g_d_mu])
 
@@ -1156,7 +1158,7 @@ class L1Optimizer(Optimizer):  # pragma: no cover
 
                 delta[n] = d
                 b_dot_d += b[n] * d
-                norm_d += d ** 2
+                norm_d += d**2
                 distance += np.abs(d - dx)
         else:  # mu == 0
             for n in range(N):
@@ -1171,7 +1173,7 @@ class L1Optimizer(Optimizer):  # pragma: no cover
 
                 delta[n] = d
                 b_dot_d += b[n] * d
-                norm_d += d ** 2
+                norm_d += d**2
                 distance += np.abs(d - dx)
 
         if touchup:
@@ -1187,7 +1189,7 @@ class L1Optimizer(Optimizer):  # pragma: no cover
                     old_d = delta[n]
                     new_d = old_d + dc / b[n]
 
-                    if x[n] + new_d <= max_ and x[n] + new_d >= min_ and norm_d - old_d ** 2 + new_d ** 2 <= r ** 2:
+                    if x[n] + new_d <= max_ and x[n] + new_d >= min_ and norm_d - old_d**2 + new_d**2 <= r**2:
                         # conditions (a) and (b) are fulfilled
                         if k == 0:
                             min_distance = distance - np.abs(old_d - dx) + np.abs(new_d - dx)
@@ -1234,7 +1236,7 @@ class LinfOptimizer(Optimizer):  # pragma: no cover
         func_calls = 0
 
         bnorm = np.linalg.norm(b)
-        lambda0 = 2 * c / bnorm ** 2
+        lambda0 = 2 * c / bnorm**2
 
         k = 0
 
@@ -1283,7 +1285,7 @@ class LinfOptimizer(Optimizer):  # pragma: no cover
 
             min ||delta||_2^2 s.t. lower <= x + delta <= upper AND b.dot(delta) = c
 
-        Lets forget about the box constraints for a second, i.e.
+        Let's forget about the box constraints for a second, i.e.
 
             min ||delta||_2^2 s.t. b.dot(delta) = c
 
@@ -1351,10 +1353,10 @@ class LinfOptimizer(Optimizer):  # pragma: no cover
                     _active_bnorm += b[n] ** 2
 
                 _c += b[n] * delta_step
-                norm += delta_step ** 2
+                norm += delta_step**2
 
             if 0.9999 * np.abs(c) - EPS < np.abs(_c) < 1.0001 * np.abs(c) + EPS:
-                if norm > r ** 2:
+                if norm > r**2:
                     return -np.inf, k, _lambda
                 else:
                     return -epsilon, k, _lambda
@@ -1536,7 +1538,7 @@ class L0Optimizer(Optimizer):  # pragma: no cover
 
         ργ = ρ * γ
         ρχ = ρ * χ
-        σ_n = σ ** n
+        σ_n = σ**n
 
         f_val = np.empty(n + 1, dtype=np.float64)
         for i in range(n + 1):
@@ -1768,7 +1770,7 @@ class L0Optimizer(Optimizer):  # pragma: no cover
         lam, mu = params
         N = x0.shape[0]
 
-        g = -mu * r ** 2 - lam * c
+        g = -mu * r**2 - lam * c
 
         if mu > 0:
             t = 1 / (2 * mu)
@@ -1777,7 +1779,7 @@ class L0Optimizer(Optimizer):  # pragma: no cover
                 dx = x0[n] - x[n]
                 bn = b[n]
 
-                case1 = lam * bn * dx + mu * dx ** 2
+                case1 = lam * bn * dx + mu * dx**2
 
                 optd = -lam * bn * t
                 if optd < min_ - x[n]:
@@ -1785,12 +1787,12 @@ class L0Optimizer(Optimizer):  # pragma: no cover
                 elif optd > max_ - x[n]:
                     optd = max_ - x[n]
 
-                case2 = 1 + lam * bn * optd + mu * optd ** 2
+                case2 = 1 + lam * bn * optd + mu * optd**2
 
                 if case1 <= case2:
-                    g += mu * dx ** 2 + lam * bn * dx
+                    g += mu * dx**2 + lam * bn * dx
                 else:
-                    g += 1 + mu * optd ** 2 + lam * bn * optd
+                    g += 1 + mu * optd**2 + lam * bn * optd
         else:
             # arg min_delta ||delta - dx||_0 + lam * b^T delta
             # case delta[n] = dx[n]: lam * b[n] * dx[n]
@@ -1802,7 +1804,7 @@ class L0Optimizer(Optimizer):  # pragma: no cover
                 case2 = 1 + lam * bn * (min_ - x[n])
                 case3 = 1 + lam * bn * (max_ - x[n])
                 if case1 <= case2 and case1 <= case3:
-                    g += mu * dx ** 2 + lam * bn * dx
+                    g += mu * dx**2 + lam * bn * dx
                 elif case2 < case3:
                     g += 1 + mu * (min_ - x[n]) ** 2 + lam * bn * (min_ - x[n])
                 else:
@@ -1851,7 +1853,7 @@ class L0Optimizer(Optimizer):  # pragma: no cover
                 bn = b[n]
                 t = 1 / (2 * mu)
 
-                case1 = lam * bn * dx + mu * dx ** 2
+                case1 = lam * bn * dx + mu * dx**2
 
                 optd = -lam * bn * t
                 if optd < min_ - x[n]:
@@ -1859,7 +1861,7 @@ class L0Optimizer(Optimizer):  # pragma: no cover
                 elif optd > max_ - x[n]:
                     optd = max_ - x[n]
 
-                case2 = 1 + lam * bn * optd + mu * optd ** 2
+                case2 = 1 + lam * bn * optd + mu * optd**2
 
                 if case1 <= case2:
                     d = dx
@@ -1869,7 +1871,7 @@ class L0Optimizer(Optimizer):  # pragma: no cover
 
                 delta[n] = d
                 b_dot_d += bn * d
-                norm_d += d ** 2
+                norm_d += d**2
         else:  # mu == 0
             for n in range(N):
                 dx = x0[n] - x[n]
@@ -1887,7 +1889,7 @@ class L0Optimizer(Optimizer):  # pragma: no cover
                     distance += 1
 
                 delta[n] = d
-                norm_d += d ** 2
+                norm_d += d**2
                 b_dot_d += bn * d
 
         if touchup:
@@ -1906,22 +1908,22 @@ class L0Optimizer(Optimizer):  # pragma: no cover
                     old_d = delta[n]
                     new_d = old_d + dc / b[n]
 
-                    if x[n] + new_d <= max_ and x[n] + new_d >= min_ and norm_d - old_d ** 2 + new_d ** 2 <= r ** 2:
+                    if x[n] + new_d <= max_ and x[n] + new_d >= min_ and norm_d - old_d**2 + new_d**2 <= r**2:
                         # conditions (a) and (b) are fulfilled
                         if k == 0:
                             min_distance = distance - (np.abs(old_d - dx) > 1e-10) + (np.abs(new_d - dx) > 1e-10)
                             min_distance_idx = n
-                            min_norm = norm_d - old_d ** 2 + new_d ** 2
+                            min_norm = norm_d - old_d**2 + new_d**2
                             k += 1
                         else:
                             new_distance = distance - (np.abs(old_d - dx) > 1e-10) + (np.abs(new_d - dx) > 1e-10)
                             if (
                                 min_distance > new_distance
                                 or min_distance == new_distance
-                                and min_norm > norm_d - old_d ** 2 + new_d ** 2
+                                and min_norm > norm_d - old_d**2 + new_d**2
                             ):
                                 min_distance = new_distance
-                                min_norm = norm_d - old_d ** 2 + new_d ** 2
+                                min_norm = norm_d - old_d**2 + new_d**2
                                 min_distance_idx = n
 
             if k > 0:
@@ -1983,7 +1985,7 @@ class BrendelBethgeAttack(EvasionAttack):
     def __init__(
         self,
         estimator: "CLASSIFIER_LOSS_GRADIENTS_TYPE",
-        norm: Union[int, float, str] = np.inf,
+        norm: int | float | str = np.inf,
         targeted: bool = False,
         overshoot: float = 1.1,
         steps: int = 1000,
@@ -2057,7 +2059,8 @@ class BrendelBethgeAttack(EvasionAttack):
                 nb_classes=estimator.nb_classes,
                 input_shape=estimator.input_shape,
                 loss_object=self._loss_object,
-                train_step=estimator._train_step,
+                optimizer=estimator.optimizer,
+                train_step=estimator.train_step,
                 channels_first=estimator.channels_first,
                 clip_values=estimator.clip_values,
                 preprocessing_defences=estimator.preprocessing_defences,
@@ -2167,7 +2170,7 @@ class BrendelBethgeAttack(EvasionAttack):
     def generate(
         self,
         x: np.ndarray,
-        y: Optional[np.ndarray] = None,
+        y: np.ndarray | None = None,
         **kwargs,
     ) -> np.ndarray:
         """
@@ -2186,7 +2189,7 @@ class BrendelBethgeAttack(EvasionAttack):
         originals = x.copy()
 
         if y is not None:
-            y = check_and_transform_label_format(y, self.estimator.nb_classes)
+            y = check_and_transform_label_format(y, nb_classes=self.estimator.nb_classes)
 
         if y is None:
             # Throw error if attack is targeted, but no targets are provided
@@ -2379,7 +2382,7 @@ class BrendelBethgeAttack(EvasionAttack):
         return best_advs.astype(config.ART_NUMPY_DTYPE)
 
     def norms(self, x: np.ndarray) -> np.ndarray:
-        order = self.norm if self.norm != "inf" else np.inf
+        order = float(self.norm) if self.norm != "inf" else np.inf
         norm = np.linalg.norm(x=x.reshape(x.shape[0], -1), ord=order, axis=1)
         return norm
 
@@ -2388,7 +2391,7 @@ class BrendelBethgeAttack(EvasionAttack):
         x0: np.ndarray,
         x1: np.ndarray,
         epsilons: np.ndarray,
-        bounds: Tuple[float, float],
+        bounds: tuple[float, float],
     ) -> np.ndarray:
         """
         returns a point between x0 and x1 where epsilon = 0 returns x0 and epsilon = 1 returns x1
@@ -2400,18 +2403,18 @@ class BrendelBethgeAttack(EvasionAttack):
             threshold = (bounds[1] - bounds[0]) * epsilons
             mask = np.abs(x1 - x0) < threshold
             new_x = np.where(mask, x1, x0)
-        if self.norm == 1:
+        elif self.norm == 1:
             # get epsilons in right shape for broadcasting
             epsilons = epsilons.reshape(epsilons.shape + (1,) * (x0.ndim - 1))
 
             threshold = (bounds[1] - bounds[0]) * (1 - epsilons)
             mask = np.abs(x1 - x0) > threshold
             new_x = np.where(mask, x0 + np.sign(x1 - x0) * (np.abs(x1 - x0) - threshold), x0)
-        if self.norm == 2:
+        elif self.norm == 2:
             # get epsilons in right shape for broadcasting
             epsilons = epsilons.reshape(epsilons.shape + (1,) * (x0.ndim - 1))
             new_x = epsilons * x1 + (1 - epsilons) * x0
-        if self.norm in ["inf", np.inf]:
+        elif self.norm in ["inf", np.inf]:
             delta = x1 - x0
             min_, max_ = bounds
             s = max_ - min_
@@ -2421,6 +2424,8 @@ class BrendelBethgeAttack(EvasionAttack):
             clipped_delta = np.where(delta < -epsilons * s, -epsilons * s, delta)
             clipped_delta = np.where(clipped_delta > epsilons * s, epsilons * s, clipped_delta)
             new_x = x0 + clipped_delta
+        else:
+            raise ValueError("Value of `norm` is not supported.")
 
         return new_x.astype(config.ART_NUMPY_DTYPE)
 
@@ -2433,7 +2438,7 @@ class BrendelBethgeAttack(EvasionAttack):
         adv_init: np.ndarray,
         clip_min: float,
         clip_max: float,
-    ) -> Optional[Union[np.ndarray, Tuple[np.ndarray, int]]]:
+    ) -> np.ndarray | tuple[np.ndarray, int] | None:
         """
         Find initial adversarial example for the attack.
 
@@ -2522,10 +2527,10 @@ class BrendelBethgeAttack(EvasionAttack):
         current_sample: np.ndarray,
         original_sample: np.ndarray,
         target: int,
-        norm: Union[int, float, str],
+        norm: int | float | str,
         clip_min: float,
         clip_max: float,
-        threshold: Optional[float] = None,
+        threshold: float | None = None,
     ) -> np.ndarray:
         """
         Binary search to approach the boundary.
@@ -2541,15 +2546,15 @@ class BrendelBethgeAttack(EvasionAttack):
         """
         # First set upper and lower bounds as well as the threshold for the binary search
         if norm == 2:
-            (upper_bound, lower_bound) = (1, 0)
+            upper_bound, lower_bound = (np.array(1.0), np.array(0.0))
 
             if threshold is None:
                 threshold = self.theta
 
         else:
-            (upper_bound, lower_bound) = (
+            upper_bound, lower_bound = (
                 np.max(abs(original_sample - current_sample)),
-                0,
+                np.array(0.0),
             )
 
             if threshold is None:
@@ -2579,7 +2584,7 @@ class BrendelBethgeAttack(EvasionAttack):
         result = self._interpolate(
             current_sample=current_sample,
             original_sample=original_sample,
-            alpha=upper_bound,
+            alpha=float(upper_bound),
             norm=norm,
         )
 
@@ -2587,7 +2592,7 @@ class BrendelBethgeAttack(EvasionAttack):
 
     @staticmethod
     def _interpolate(
-        current_sample: np.ndarray, original_sample: np.ndarray, alpha: float, norm: Union[int, float, str]
+        current_sample: np.ndarray, original_sample: np.ndarray, alpha: float, norm: int | float | str
     ) -> np.ndarray:
         """
         Interpolate a new sample based on the original and the current samples.
@@ -2603,7 +2608,7 @@ class BrendelBethgeAttack(EvasionAttack):
         else:
             result = np.clip(current_sample, original_sample - alpha, original_sample + alpha)
 
-        return result
+        return result.astype(current_sample.dtype)
 
     def _adversarial_satisfactory(
         self, samples: np.ndarray, target: int, clip_min: float, clip_max: float
@@ -2617,7 +2622,7 @@ class BrendelBethgeAttack(EvasionAttack):
         :param clip_max: Maximum value of an example.
         :return: An array of 0/1.
         """
-        samples = np.clip(samples, clip_min, clip_max)
+        samples = np.clip(samples, clip_min, clip_max).astype(samples.dtype)
         preds = np.argmax(self.estimator.predict(samples, batch_size=self.batch_size), axis=1)
 
         if self.targeted:

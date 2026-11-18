@@ -21,12 +21,13 @@ attack.
 
 | Paper link: https://arxiv.org/abs/1610.08401
 """
-from __future__ import absolute_import, division, print_function, unicode_literals
+
+from __future__ import absolute_import, division, print_function, unicode_literals, annotations
 
 import logging
 import random
 import types
-from typing import Any, Dict, Optional, Union, TYPE_CHECKING
+from typing import Any, TYPE_CHECKING
 
 import numpy as np
 from tqdm.auto import tqdm
@@ -79,11 +80,11 @@ class UniversalPerturbation(EvasionAttack):
         self,
         classifier: "CLASSIFIER_TYPE",
         attacker: str = "deepfool",
-        attacker_params: Optional[Dict[str, Any]] = None,
+        attacker_params: dict[str, Any] | None = None,
         delta: float = 0.2,
         max_iter: int = 20,
         eps: float = 10.0,
-        norm: Union[int, float, str] = np.inf,
+        norm: int | float | str = np.inf,
         batch_size: int = 32,
         verbose: bool = True,
     ) -> None:
@@ -112,12 +113,12 @@ class UniversalPerturbation(EvasionAttack):
         self._check_params()
 
         # Attack properties
-        self._fooling_rate: Optional[float] = None
-        self._converged: Optional[bool] = None
-        self._noise: Optional[np.ndarray] = None
+        self._fooling_rate: float | None = None
+        self._converged: bool | None = None
+        self._noise: np.ndarray | None = None
 
     @property
-    def fooling_rate(self) -> Optional[float]:
+    def fooling_rate(self) -> float | None:
         """
         The fooling rate of the universal perturbation on the most recent call to `generate`.
 
@@ -126,7 +127,7 @@ class UniversalPerturbation(EvasionAttack):
         return self._fooling_rate
 
     @property
-    def converged(self) -> Optional[bool]:
+    def converged(self) -> bool | None:
         """
         The convergence of universal perturbation generation.
 
@@ -135,7 +136,7 @@ class UniversalPerturbation(EvasionAttack):
         return self._converged
 
     @property
-    def noise(self) -> Optional[np.ndarray]:
+    def noise(self) -> np.ndarray | None:
         """
         The universal perturbation.
 
@@ -143,7 +144,7 @@ class UniversalPerturbation(EvasionAttack):
         """
         return self._noise
 
-    def generate(self, x: np.ndarray, y: Optional[np.ndarray] = None, **kwargs) -> np.ndarray:
+    def generate(self, x: np.ndarray, y: np.ndarray | None = None, **kwargs) -> np.ndarray:
         """
         Generate adversarial samples and return them in an array.
 
@@ -154,7 +155,7 @@ class UniversalPerturbation(EvasionAttack):
         logger.info("Computing universal perturbation based on %s attack.", self.attacker)
 
         if y is not None:
-            y = check_and_transform_label_format(y, self.estimator.nb_classes)
+            y = check_and_transform_label_format(y, nb_classes=self.estimator.nb_classes)
 
         if y is None:
             # Use model predictions as true labels
@@ -223,7 +224,7 @@ class UniversalPerturbation(EvasionAttack):
 
         return x_adv
 
-    def _get_attack(self, a_name: str, params: Optional[Dict[str, Any]] = None) -> EvasionAttack:
+    def _get_attack(self, a_name: str, params: dict[str, Any] | None = None) -> EvasionAttack:
         """
         Get an attack object from its name.
 

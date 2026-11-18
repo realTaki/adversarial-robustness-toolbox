@@ -21,8 +21,11 @@ This module implements the Label-Only Inference Attack based on Decision Boundar
 | Paper link: https://arxiv.org/abs/2007.14321 (Choquette-Choo et al.)
 | Paper link: https://arxiv.org/abs/2007.15528 (Li and Zhang)
 """
+
+from __future__ import annotations
+
 import logging
-from typing import Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -52,7 +55,7 @@ class LabelOnlyDecisionBoundary(MembershipInferenceAttack):
     ]
     _estimator_requirements = (BaseEstimator, ClassifierMixin)
 
-    def __init__(self, estimator: "CLASSIFIER_TYPE", distance_threshold_tau: Optional[float] = None):
+    def __init__(self, estimator: "CLASSIFIER_TYPE", distance_threshold_tau: float | None = None):
         """
         Create a `LabelOnlyDecisionBoundary` instance for Label-Only Inference Attack based on Decision Boundary.
 
@@ -65,7 +68,7 @@ class LabelOnlyDecisionBoundary(MembershipInferenceAttack):
         self.threshold_bins: list = []
         self._check_params()
 
-    def infer(self, x: np.ndarray, y: Optional[np.ndarray] = None, **kwargs) -> np.ndarray:
+    def infer(self, x: np.ndarray, y: np.ndarray | None = None, **kwargs) -> np.ndarray:
         """
         Infer membership of input `x` in estimator's training data.
 
@@ -109,7 +112,7 @@ class LabelOnlyDecisionBoundary(MembershipInferenceAttack):
         if "targeted" in kwargs:  # pragma: no cover
             raise ValueError("Keyword `targeted` in kwargs is not supported.")
 
-        y = check_and_transform_label_format(y, self.estimator.nb_classes)
+        y = check_and_transform_label_format(y, nb_classes=self.estimator.nb_classes)
 
         hsj = HopSkipJump(classifier=self.estimator, targeted=False, **kwargs)
         x_adv = hsj.generate(x=x, y=y)
@@ -163,10 +166,10 @@ class LabelOnlyDecisionBoundary(MembershipInferenceAttack):
         if "targeted" in kwargs:  # pragma: no cover
             raise ValueError("Keyword `targeted` in kwargs is not supported.")
 
-        y_train_onehot = check_and_transform_label_format(y_train, self.estimator.nb_classes)
+        y_train_onehot = check_and_transform_label_format(y_train, nb_classes=self.estimator.nb_classes)
         if y_train_onehot is None:
             raise ValueError("None value detected.")
-        y_test_onehot = check_and_transform_label_format(y_test, self.estimator.nb_classes)
+        y_test_onehot = check_and_transform_label_format(y_test, nb_classes=self.estimator.nb_classes)
         if y_test_onehot is None:
             raise ValueError("None value detected.")
 
@@ -241,7 +244,7 @@ class LabelOnlyDecisionBoundary(MembershipInferenceAttack):
         x_rand += x_min  # shift
 
         y_rand = self.estimator.predict(x=x_rand)
-        y_rand = check_and_transform_label_format(y_rand, self.estimator.nb_classes)
+        y_rand = check_and_transform_label_format(y_rand, nb_classes=self.estimator.nb_classes)
 
         hsj = HopSkipJump(classifier=self.estimator, targeted=False, **kwargs)
 

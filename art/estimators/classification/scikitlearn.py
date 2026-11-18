@@ -18,15 +18,16 @@
 """
 This module implements the classifiers for scikit-learn models.
 """
-# pylint: disable=C0302
-from __future__ import absolute_import, division, print_function, unicode_literals
 
+from __future__ import absolute_import, division, print_function, unicode_literals, annotations
+
+from collections.abc import Callable
 from copy import deepcopy
 import importlib
 import logging
 import os
 import pickle
-from typing import Callable, List, Optional, Tuple, Union, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -41,7 +42,7 @@ from art.utils import to_categorical
 from art import config
 
 if TYPE_CHECKING:
-    # pylint: disable=C0412
+
     import sklearn
 
     from art.utils import CLIP_VALUES_TYPE, PREPROCESSING_TYPE
@@ -52,12 +53,12 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-# pylint: disable=C0103
+# pylint: disable=invalid-name
 def SklearnClassifier(
     model: "sklearn.base.BaseEstimator",
-    clip_values: Optional["CLIP_VALUES_TYPE"] = None,
-    preprocessing_defences: Union["Preprocessor", List["Preprocessor"], None] = None,
-    postprocessing_defences: Union["Postprocessor", List["Postprocessor"], None] = None,
+    clip_values: "CLIP_VALUES_TYPE" | None = None,
+    preprocessing_defences: "Preprocessor" | list["Preprocessor"] | None = None,
+    postprocessing_defences: "Postprocessor" | list["Postprocessor"] | None = None,
     preprocessing: "PREPROCESSING_TYPE" = (0.0, 1.0),
     use_logits: bool = False,
 ) -> "ScikitlearnClassifier":
@@ -99,7 +100,7 @@ def SklearnClassifier(
     )
 
 
-class ScikitlearnClassifier(ClassifierMixin, ScikitlearnEstimator):  # lgtm [py/missing-call-to-init]
+class ScikitlearnClassifier(ClassifierMixin, ScikitlearnEstimator):
     """
     Class for scikit-learn classifier models.
     """
@@ -109,9 +110,9 @@ class ScikitlearnClassifier(ClassifierMixin, ScikitlearnEstimator):  # lgtm [py/
     def __init__(
         self,
         model: "sklearn.base.BaseEstimator",
-        clip_values: Optional["CLIP_VALUES_TYPE"] = None,
-        preprocessing_defences: Union["Preprocessor", List["Preprocessor"], None] = None,
-        postprocessing_defences: Union["Postprocessor", List["Postprocessor"], None] = None,
+        clip_values: "CLIP_VALUES_TYPE" | None = None,
+        preprocessing_defences: "Preprocessor" | list["Preprocessor"] | None = None,
+        postprocessing_defences: "Postprocessor" | list["Postprocessor"] | None = None,
         preprocessing: "PREPROCESSING_TYPE" = (0.0, 1.0),
         use_logits: bool = False,
     ) -> None:
@@ -143,7 +144,7 @@ class ScikitlearnClassifier(ClassifierMixin, ScikitlearnEstimator):  # lgtm [py/
         self._use_logits = use_logits
 
     @property
-    def input_shape(self) -> Tuple[int, ...]:
+    def input_shape(self) -> tuple[int, ...]:
         """
         Return the shape of one input sample.
 
@@ -192,16 +193,15 @@ class ScikitlearnClassifier(ClassifierMixin, ScikitlearnEstimator):  # lgtm [py/
             if callable(getattr(self.model, "predict_log_proba", None)):
                 y_pred = self.model.predict_log_proba(x_preprocessed)
             else:  # pragma: no cover
-                logger.warning(
-                    "use_logits was True but classifier did not have callable predict_log_proba member. Falling back to"
-                    " probabilities"
+                raise ValueError(
+                    "Argument `use_logits` was True but classifier model does not have callable" "`predict_log_proba`."
                 )
         elif callable(getattr(self.model, "predict_proba", None)):
             y_pred = self.model.predict_proba(x_preprocessed)
         elif callable(getattr(self.model, "predict", None)):
             y_pred = to_categorical(
                 self.model.predict(x_preprocessed),
-                nb_classes=self.model.classes_.shape[0],
+                nb_classes=self._get_nb_classes(),
             )
         else:  # pragma: no cover
             raise ValueError("The provided model does not have methods `predict_proba` or `predict`.")
@@ -211,7 +211,7 @@ class ScikitlearnClassifier(ClassifierMixin, ScikitlearnEstimator):  # lgtm [py/
 
         return predictions
 
-    def save(self, filename: str, path: Optional[str] = None) -> None:
+    def save(self, filename: str, path: str | None = None) -> None:
         """
         Save a model to file in the format specific to the backend framework.
 
@@ -230,13 +230,13 @@ class ScikitlearnClassifier(ClassifierMixin, ScikitlearnEstimator):  # lgtm [py/
         with open(full_path + ".pickle", "wb") as file_pickle:
             pickle.dump(self.model, file=file_pickle)
 
-    def clone_for_refitting(self) -> "ScikitlearnClassifier":  # lgtm [py/inheritance/incorrect-overridden-signature]
+    def clone_for_refitting(self) -> "ScikitlearnClassifier":
         """
         Create a copy of the classifier that can be refit from scratch.
 
         :return: new estimator
         """
-        import sklearn  # lgtm [py/repeated-import]
+        import sklearn
 
         clone = type(self)(sklearn.base.clone(self.model))
         params = self.get_params()
@@ -271,9 +271,9 @@ class ScikitlearnDecisionTreeClassifier(ScikitlearnClassifier):
     def __init__(
         self,
         model: "sklearn.tree.DecisionTreeClassifier",
-        clip_values: Optional["CLIP_VALUES_TYPE"] = None,
-        preprocessing_defences: Union["Preprocessor", List["Preprocessor"], None] = None,
-        postprocessing_defences: Union["Postprocessor", List["Postprocessor"], None] = None,
+        clip_values: "CLIP_VALUES_TYPE" | None = None,
+        preprocessing_defences: "Preprocessor" | list["Preprocessor"] | None = None,
+        postprocessing_defences: "Postprocessor" | list["Postprocessor"] | None = None,
         preprocessing: "PREPROCESSING_TYPE" = (0.0, 1.0),
     ) -> None:
         """
@@ -288,7 +288,7 @@ class ScikitlearnDecisionTreeClassifier(ScikitlearnClassifier):
                used for data preprocessing. The first value will be subtracted from the input. The input will then
                be divided by the second one.
         """
-        import sklearn  # lgtm [py/repeated-import]
+        import sklearn
 
         if not isinstance(model, sklearn.tree.DecisionTreeClassifier) and model is not None:
             raise TypeError("Model must be of type sklearn.tree.DecisionTreeClassifier.")
@@ -368,7 +368,7 @@ class ScikitlearnDecisionTreeClassifier(ScikitlearnClassifier):
         """
         return self.model.tree_.value[node_id] / np.linalg.norm(self.model.tree_.value[node_id])
 
-    def _get_leaf_nodes(self, node_id, i_tree, class_label, box) -> List["LeafNode"]:
+    def _get_leaf_nodes(self, node_id, i_tree, class_label, box) -> list["LeafNode"]:
         from art.metrics.verification_decisions_trees import LeafNode, Box, Interval
 
         leaf_nodes = []
@@ -417,9 +417,9 @@ class ScikitlearnExtraTreeClassifier(ScikitlearnDecisionTreeClassifier):
     def __init__(
         self,
         model: "sklearn.tree.ExtraTreeClassifier",
-        clip_values: Optional["CLIP_VALUES_TYPE"] = None,
-        preprocessing_defences: Union["Preprocessor", List["Preprocessor"], None] = None,
-        postprocessing_defences: Union["Postprocessor", List["Postprocessor"], None] = None,
+        clip_values: "CLIP_VALUES_TYPE" | None = None,
+        preprocessing_defences: "Preprocessor" | list["Preprocessor"] | None = None,
+        postprocessing_defences: "Postprocessor" | list["Postprocessor"] | None = None,
         preprocessing: "PREPROCESSING_TYPE" = (0.0, 1.0),
     ) -> None:
         """
@@ -434,7 +434,7 @@ class ScikitlearnExtraTreeClassifier(ScikitlearnDecisionTreeClassifier):
                used for data preprocessing. The first value will be subtracted from the input. The input will then
                be divided by the second one.
         """
-        import sklearn  # lgtm [py/repeated-import]
+        import sklearn
 
         if not isinstance(model, sklearn.tree.ExtraTreeClassifier):
             raise TypeError("Model must be of type sklearn.tree.ExtraTreeClassifier.")
@@ -456,9 +456,9 @@ class ScikitlearnAdaBoostClassifier(ScikitlearnClassifier):
     def __init__(
         self,
         model: "sklearn.ensemble.AdaBoostClassifier",
-        clip_values: Optional["CLIP_VALUES_TYPE"] = None,
-        preprocessing_defences: Union["Preprocessor", List["Preprocessor"], None] = None,
-        postprocessing_defences: Union["Postprocessor", List["Postprocessor"], None] = None,
+        clip_values: "CLIP_VALUES_TYPE" | None = None,
+        preprocessing_defences: "Preprocessor" | list["Preprocessor"] | None = None,
+        postprocessing_defences: "Postprocessor" | list["Postprocessor"] | None = None,
         preprocessing: "PREPROCESSING_TYPE" = (0.0, 1.0),
     ) -> None:
         """
@@ -473,7 +473,7 @@ class ScikitlearnAdaBoostClassifier(ScikitlearnClassifier):
                used for data preprocessing. The first value will be subtracted from the input. The input will then
                be divided by the second one.
         """
-        import sklearn  # lgtm [py/repeated-import]
+        import sklearn
 
         if not isinstance(model, sklearn.ensemble.AdaBoostClassifier):
             raise TypeError("Model must be of type sklearn.ensemble.AdaBoostClassifier.")
@@ -495,9 +495,9 @@ class ScikitlearnBaggingClassifier(ScikitlearnClassifier):
     def __init__(
         self,
         model: "sklearn.ensemble.BaggingClassifier",
-        clip_values: Optional["CLIP_VALUES_TYPE"] = None,
-        preprocessing_defences: Union["Preprocessor", List["Preprocessor"], None] = None,
-        postprocessing_defences: Union["Postprocessor", List["Postprocessor"], None] = None,
+        clip_values: "CLIP_VALUES_TYPE" | None = None,
+        preprocessing_defences: "Preprocessor" | list["Preprocessor"] | None = None,
+        postprocessing_defences: "Postprocessor" | list["Postprocessor"] | None = None,
         preprocessing: "PREPROCESSING_TYPE" = (0.0, 1.0),
     ) -> None:
         """
@@ -512,8 +512,8 @@ class ScikitlearnBaggingClassifier(ScikitlearnClassifier):
                used for data preprocessing. The first value will be subtracted from the input. The input will then
                be divided by the second one.
         """
-        # pylint: disable=E0001
-        import sklearn  # lgtm [py/repeated-import]
+
+        import sklearn
 
         if not isinstance(model, sklearn.ensemble.BaggingClassifier):
             raise TypeError("Model must be of type sklearn.ensemble.BaggingClassifier.")
@@ -535,9 +535,9 @@ class ScikitlearnExtraTreesClassifier(ScikitlearnClassifier, DecisionTreeMixin):
     def __init__(
         self,
         model: "sklearn.ensemble.ExtraTreesClassifier",
-        clip_values: Optional["CLIP_VALUES_TYPE"] = None,
-        preprocessing_defences: Union["Preprocessor", List["Preprocessor"], None] = None,
-        postprocessing_defences: Union["Postprocessor", List["Postprocessor"], None] = None,
+        clip_values: "CLIP_VALUES_TYPE" | None = None,
+        preprocessing_defences: "Preprocessor" | list["Preprocessor"] | None = None,
+        postprocessing_defences: "Postprocessor" | list["Postprocessor"] | None = None,
         preprocessing: "PREPROCESSING_TYPE" = (0.0, 1.0),
     ):
         """
@@ -552,8 +552,8 @@ class ScikitlearnExtraTreesClassifier(ScikitlearnClassifier, DecisionTreeMixin):
                used for data preprocessing. The first value will be subtracted from the input. The input will then
                be divided by the second one.
         """
-        # pylint: disable=E0001
-        import sklearn  # lgtm [py/repeated-import]
+
+        import sklearn
 
         if not isinstance(model, sklearn.ensemble.ExtraTreesClassifier):
             raise TypeError("Model must be of type sklearn.ensemble.ExtraTreesClassifier.")
@@ -566,7 +566,7 @@ class ScikitlearnExtraTreesClassifier(ScikitlearnClassifier, DecisionTreeMixin):
             preprocessing=preprocessing,
         )
 
-    def get_trees(self) -> List["Tree"]:  # lgtm [py/similar-function]
+    def get_trees(self) -> list["Tree"]:
         """
         Get the decision trees.
 
@@ -589,7 +589,6 @@ class ScikitlearnExtraTreesClassifier(ScikitlearnClassifier, DecisionTreeMixin):
             for i_class in range(self.model.n_classes_):
                 class_label = i_class
 
-                # pylint: disable=W0212
                 trees.append(
                     Tree(
                         class_id=class_label,
@@ -608,9 +607,9 @@ class ScikitlearnGradientBoostingClassifier(ScikitlearnClassifier, DecisionTreeM
     def __init__(
         self,
         model: "sklearn.ensemble.GradientBoostingClassifier",
-        clip_values: Optional["CLIP_VALUES_TYPE"] = None,
-        preprocessing_defences: Union["Preprocessor", List["Preprocessor"], None] = None,
-        postprocessing_defences: Union["Postprocessor", List["Postprocessor"], None] = None,
+        clip_values: "CLIP_VALUES_TYPE" | None = None,
+        preprocessing_defences: "Preprocessor" | list["Preprocessor"] | None = None,
+        postprocessing_defences: "Postprocessor" | list["Postprocessor"] | None = None,
         preprocessing: "PREPROCESSING_TYPE" = (0.0, 1.0),
     ) -> None:
         """
@@ -625,8 +624,8 @@ class ScikitlearnGradientBoostingClassifier(ScikitlearnClassifier, DecisionTreeM
                used for data preprocessing. The first value will be subtracted from the input. The input will then
                be divided by the second one.
         """
-        # pylint: disable=E0001
-        import sklearn  # lgtm [py/repeated-import]
+
+        import sklearn
 
         if not isinstance(model, sklearn.ensemble.GradientBoostingClassifier):
             raise TypeError("Model must be of type sklearn.ensemble.GradientBoostingClassifier.")
@@ -639,7 +638,7 @@ class ScikitlearnGradientBoostingClassifier(ScikitlearnClassifier, DecisionTreeM
             preprocessing=preprocessing,
         )
 
-    def get_trees(self) -> List["Tree"]:
+    def get_trees(self) -> list["Tree"]:
         """
         Get the decision trees.
 
@@ -663,7 +662,6 @@ class ScikitlearnGradientBoostingClassifier(ScikitlearnClassifier, DecisionTreeM
                 else:
                     class_label = i_class
 
-                # pylint: disable=W0212
                 trees.append(
                     Tree(
                         class_id=class_label,
@@ -682,9 +680,9 @@ class ScikitlearnRandomForestClassifier(ScikitlearnClassifier):
     def __init__(
         self,
         model: "sklearn.ensemble.RandomForestClassifier",
-        clip_values: Optional["CLIP_VALUES_TYPE"] = None,
-        preprocessing_defences: Union["Preprocessor", List["Preprocessor"], None] = None,
-        postprocessing_defences: Union["Postprocessor", List["Postprocessor"], None] = None,
+        clip_values: "CLIP_VALUES_TYPE" | None = None,
+        preprocessing_defences: "Preprocessor" | list["Preprocessor"] | None = None,
+        postprocessing_defences: "Postprocessor" | list["Postprocessor"] | None = None,
         preprocessing: "PREPROCESSING_TYPE" = (0.0, 1.0),
     ) -> None:
         """
@@ -699,8 +697,8 @@ class ScikitlearnRandomForestClassifier(ScikitlearnClassifier):
                used for data preprocessing. The first value will be subtracted from the input. The input will then
                be divided by the second one.
         """
-        # pylint: disable=E0001
-        import sklearn  # lgtm [py/repeated-import]
+
+        import sklearn
 
         if not isinstance(model, sklearn.ensemble.RandomForestClassifier):
             raise TypeError("Model must be of type sklearn.ensemble.RandomForestClassifier.")
@@ -713,7 +711,7 @@ class ScikitlearnRandomForestClassifier(ScikitlearnClassifier):
             preprocessing=preprocessing,
         )
 
-    def get_trees(self) -> List["Tree"]:  # lgtm [py/similar-function]
+    def get_trees(self) -> list["Tree"]:
         """
         Get the decision trees.
 
@@ -736,7 +734,6 @@ class ScikitlearnRandomForestClassifier(ScikitlearnClassifier):
             for i_class in range(self.model.n_classes_):
                 class_label = i_class
 
-                # pylint: disable=W0212
                 trees.append(
                     Tree(
                         class_id=class_label,
@@ -755,9 +752,9 @@ class ScikitlearnLogisticRegression(ClassGradientsMixin, LossGradientsMixin, Sci
     def __init__(
         self,
         model: "sklearn.linear_model.LogisticRegression",
-        clip_values: Optional["CLIP_VALUES_TYPE"] = None,
-        preprocessing_defences: Union["Preprocessor", List["Preprocessor"], None] = None,
-        postprocessing_defences: Union["Postprocessor", List["Postprocessor"], None] = None,
+        clip_values: "CLIP_VALUES_TYPE" | None = None,
+        preprocessing_defences: "Preprocessor" | list["Preprocessor"] | None = None,
+        postprocessing_defences: "Postprocessor" | list["Postprocessor"] | None = None,
         preprocessing: "PREPROCESSING_TYPE" = (0.0, 1.0),
     ) -> None:
         """
@@ -772,8 +769,8 @@ class ScikitlearnLogisticRegression(ClassGradientsMixin, LossGradientsMixin, Sci
                used for data preprocessing. The first value will be subtracted from the input. The input will then
                be divided by the second one.
         """
-        # pylint: disable=E0001
-        import sklearn  # lgtm [py/repeated-import]
+
+        import sklearn
 
         if not isinstance(model, sklearn.linear_model.LogisticRegression):
             raise TypeError("Model must be of type sklearn.linear_model.LogisticRegression).")
@@ -786,7 +783,7 @@ class ScikitlearnLogisticRegression(ClassGradientsMixin, LossGradientsMixin, Sci
             preprocessing=preprocessing,
         )
 
-    def class_gradient(self, x: np.ndarray, label: Union[int, List[int], None] = None, **kwargs) -> np.ndarray:
+    def class_gradient(self, x: np.ndarray, label: int | list[int] | np.ndarray | None = None, **kwargs) -> np.ndarray:
         """
         Compute per-class derivatives w.r.t. `x`.
 
@@ -806,10 +803,8 @@ class ScikitlearnLogisticRegression(ClassGradientsMixin, LossGradientsMixin, Sci
         :raises `TypeError`: If the requested label cannot be processed.
         """
         if not hasattr(self.model, "coef_"):  # pragma: no cover
-            raise ValueError(
-                """Model has not been fitted. Run function `fit(x, y)` of classifier first or provide a
-            fitted model."""
-            )
+            raise ValueError("""Model has not been fitted. Run function `fit(x, y)` of classifier first or provide a
+            fitted model.""")
         if self.nb_classes is None:  # pragma: no cover
             raise ValueError("Unknown number of classes in classifier.")
         nb_samples = x.shape[0]
@@ -888,14 +883,12 @@ class ScikitlearnLogisticRegression(ClassGradientsMixin, LossGradientsMixin, Sci
         :return: Array of gradients of the same shape as `x`.
         :raises `ValueError`: If the model has not been fitted prior to calling this method.
         """
-        # pylint: disable=E0001
+
         from sklearn.utils.class_weight import compute_class_weight
 
         if not hasattr(self.model, "coef_"):  # pragma: no cover
-            raise ValueError(
-                """Model has not been fitted. Run function `fit(x, y)` of classifier first or provide a
-            fitted model."""
-            )
+            raise ValueError("""Model has not been fitted. Run function `fit(x, y)` of classifier first or provide a
+            fitted model.""")
 
         # Apply preprocessing
         x_preprocessed, y_preprocessed = self._apply_preprocessing(x, y, fit=False)
@@ -925,7 +918,7 @@ class ScikitlearnLogisticRegression(ClassGradientsMixin, LossGradientsMixin, Sci
         return gradients
 
     @staticmethod
-    def get_trainable_attribute_names() -> Tuple[str, str]:
+    def get_trainable_attribute_names() -> tuple[str, str]:
         """
         Get the names of trainable attributes.
 
@@ -941,10 +934,10 @@ class ScikitlearnGaussianNB(ScikitlearnClassifier):
 
     def __init__(
         self,
-        model: Union["sklearn.naive_bayes.GaussianNB"],
-        clip_values: Optional["CLIP_VALUES_TYPE"] = None,
-        preprocessing_defences: Union["Preprocessor", List["Preprocessor"], None] = None,
-        postprocessing_defences: Union["Postprocessor", List["Postprocessor"], None] = None,
+        model: "sklearn.naive_bayes.GaussianNB",
+        clip_values: "CLIP_VALUES_TYPE" | None = None,
+        preprocessing_defences: "Preprocessor" | list["Preprocessor"] | None = None,
+        postprocessing_defences: "Postprocessor" | list["Postprocessor"] | None = None,
         preprocessing: "PREPROCESSING_TYPE" = (0.0, 1.0),
     ) -> None:
         """
@@ -959,8 +952,8 @@ class ScikitlearnGaussianNB(ScikitlearnClassifier):
                used for data preprocessing. The first value will be subtracted from the input. The input will then
                be divided by the second one.
         """
-        # pylint: disable=E0001
-        import sklearn  # lgtm [py/repeated-import]
+
+        import sklearn
 
         if not isinstance(model, sklearn.naive_bayes.GaussianNB):  # pragma: no cover
             raise TypeError(f"Model must be of type sklearn.naive_bayes.GaussianNB. Found type {type(model)}")
@@ -973,14 +966,17 @@ class ScikitlearnGaussianNB(ScikitlearnClassifier):
             preprocessing=preprocessing,
         )
 
-    @staticmethod
-    def get_trainable_attribute_names() -> Tuple[str, str]:
+    def get_trainable_attribute_names(self) -> tuple[str, str]:
         """
         Get the names of trainable attributes.
 
         :return: A tuple of trainable attributes.
         """
-        return "sigma_", "theta_"
+        # For scikit-learn <=0.24
+        if hasattr(self.model, "sigma_"):
+            return "sigma_", "theta_"
+
+        return "var_", "theta_"
 
 
 class ScikitlearnSVC(ClassGradientsMixin, LossGradientsMixin, ScikitlearnClassifier):
@@ -990,10 +986,10 @@ class ScikitlearnSVC(ClassGradientsMixin, LossGradientsMixin, ScikitlearnClassif
 
     def __init__(
         self,
-        model: Union["sklearn.svm.SVC", "sklearn.svm.LinearSVC"],
-        clip_values: Optional["CLIP_VALUES_TYPE"] = None,
-        preprocessing_defences: Union["Preprocessor", List["Preprocessor"], None] = None,
-        postprocessing_defences: Union["Postprocessor", List["Postprocessor"], None] = None,
+        model: "sklearn.svm.SVC" | "sklearn.svm.LinearSVC",
+        clip_values: "CLIP_VALUES_TYPE" | None = None,
+        preprocessing_defences: "Preprocessor" | list["Preprocessor"] | None = None,
+        postprocessing_defences: "Postprocessor" | list["Postprocessor"] | None = None,
         preprocessing: "PREPROCESSING_TYPE" = (0.0, 1.0),
     ) -> None:
         """
@@ -1008,8 +1004,8 @@ class ScikitlearnSVC(ClassGradientsMixin, LossGradientsMixin, ScikitlearnClassif
                used for data preprocessing. The first value will be subtracted from the input. The input will then
                be divided by the second one.
         """
-        # pylint: disable=E0001
-        import sklearn  # lgtm [py/repeated-import]
+
+        import sklearn
 
         if not isinstance(model, sklearn.svm.SVC) and not isinstance(model, sklearn.svm.LinearSVC):
             raise TypeError(f"Model must be of type sklearn.svm.SVC or sklearn.svm.LinearSVC. Found type {type(model)}")
@@ -1023,7 +1019,7 @@ class ScikitlearnSVC(ClassGradientsMixin, LossGradientsMixin, ScikitlearnClassif
         )
         self._kernel = self._kernel_func()
 
-    def class_gradient(self, x: np.ndarray, label: Union[int, List[int], None] = None, **kwargs) -> np.ndarray:
+    def class_gradient(self, x: np.ndarray, label: int | list[int] | np.ndarray | None = None, **kwargs) -> np.ndarray:
         """
         Compute per-class derivatives w.r.t. `x`.
 
@@ -1036,8 +1032,8 @@ class ScikitlearnSVC(ClassGradientsMixin, LossGradientsMixin, ScikitlearnClassif
                  `(batch_size, nb_classes, input_shape)` when computing for all classes, otherwise shape becomes
                  `(batch_size, 1, input_shape)` when `label` parameter is specified.
         """
-        # pylint: disable=E0001
-        import sklearn  # lgtm [py/repeated-import]
+
+        import sklearn
 
         # Apply preprocessing
         x_preprocessed, _ = self._apply_preprocessing(x, y=None, fit=False)
@@ -1211,6 +1207,9 @@ class ScikitlearnSVC(ClassGradientsMixin, LossGradientsMixin, ScikitlearnClassif
 
             gradients = self._apply_preprocessing_gradient(x, gradients)
 
+        else:
+            raise ValueError("Type of `self.model` not supported for class-gradients.")
+
         return gradients
 
     def _kernel_grad(self, sv: np.ndarray, x_sample: np.ndarray) -> np.ndarray:
@@ -1221,7 +1220,7 @@ class ScikitlearnSVC(ClassGradientsMixin, LossGradientsMixin, ScikitlearnClassif
         :param x_sample: The sample the gradient is taken with respect to.
         :return: the kernel gradient.
         """
-        # pylint: disable=W0212
+
         if self.model.kernel == "linear":
             grad = sv
         elif self.model.kernel == "poly":
@@ -1267,8 +1266,8 @@ class ScikitlearnSVC(ClassGradientsMixin, LossGradientsMixin, ScikitlearnClassif
                   `(nb_samples,)`.
         :return: Array of gradients of the same shape as `x`.
         """
-        # pylint: disable=E0001
-        import sklearn  # lgtm [py/repeated-import]
+
+        import sklearn
 
         # Apply preprocessing
         x_preprocessed, y_preprocessed = self._apply_preprocessing(x, y, fit=False)
@@ -1344,8 +1343,8 @@ class ScikitlearnSVC(ClassGradientsMixin, LossGradientsMixin, ScikitlearnClassif
 
         :return: A callable kernel function.
         """
-        # pylint: disable=E0001
-        import sklearn  # lgtm [py/repeated-import]
+
+        import sklearn
         from sklearn.metrics.pairwise import (
             polynomial_kernel,
             linear_kernel,
@@ -1399,13 +1398,13 @@ class ScikitlearnSVC(ClassGradientsMixin, LossGradientsMixin, ScikitlearnClassif
         :param x: Input samples.
         :return: Array of predictions of shape `(nb_inputs, nb_classes)`.
         """
-        # pylint: disable=E0001
-        import sklearn  # lgtm [py/repeated-import]
+
+        import sklearn
 
         # Apply defences
         x_preprocessed, _ = self._apply_preprocessing(x, y=None, fit=False)
 
-        if isinstance(self.model, sklearn.svm.SVC) and self.model.probability:
+        if isinstance(self.model, sklearn.svm.SVC) and callable(getattr(self.model, "predict_proba", None)):
             y_pred = self.model.predict_proba(X=x_preprocessed)
         else:
             y_pred_label = self.model.predict(X=x_preprocessed)

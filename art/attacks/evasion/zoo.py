@@ -22,10 +22,11 @@ gradients.
 
 | Paper link: https://arxiv.org/abs/1708.03999
 """
-from __future__ import absolute_import, division, print_function, unicode_literals
+
+from __future__ import absolute_import, division, print_function, unicode_literals, annotations
 
 import logging
-from typing import Optional, Tuple, TYPE_CHECKING
+from typing import Any, TYPE_CHECKING
 
 import numpy as np
 from scipy.ndimage import zoom
@@ -165,13 +166,13 @@ class ZooAttack(EvasionAttack):
             self._current_noise = np.zeros((batch_size,) + self.estimator.input_shape, dtype=ART_NUMPY_DTYPE)
         self._sample_prob = np.ones(self._current_noise.size, dtype=ART_NUMPY_DTYPE) / self._current_noise.size
 
-        self.adam_mean: Optional[np.ndarray] = None
-        self.adam_var: Optional[np.ndarray] = None
-        self.adam_epochs: Optional[np.ndarray] = None
+        self.adam_mean: np.ndarray | None = None
+        self.adam_var: np.ndarray | None = None
+        self.adam_epochs: np.ndarray | None = None
 
     def _loss(
         self, x: np.ndarray, x_adv: np.ndarray, target: np.ndarray, c_weight: np.ndarray
-    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
         Compute the loss function values.
 
@@ -201,7 +202,7 @@ class ZooAttack(EvasionAttack):
 
         return preds, l2dist, c_weight * loss + l2dist
 
-    def generate(self, x: np.ndarray, y: Optional[np.ndarray] = None, **kwargs) -> np.ndarray:
+    def generate(self, x: np.ndarray, y: np.ndarray | None = None, **kwargs) -> np.ndarray:
         """
         Generate adversarial samples and return them in an array.
 
@@ -211,7 +212,7 @@ class ZooAttack(EvasionAttack):
         :return: An array holding the adversarial examples.
         """
         if y is not None:
-            y = check_and_transform_label_format(y, self.estimator.nb_classes)
+            y = check_and_transform_label_format(y, nb_classes=self.estimator.nb_classes)
 
         # Check that `y` is provided for targeted attacks
         if self.targeted and y is None:  # pragma: no cover
@@ -263,7 +264,7 @@ class ZooAttack(EvasionAttack):
         c_lower_bound = np.zeros(x_batch.shape[0])
         c_upper_bound = 1e10 * np.ones(x_batch.shape[0])
 
-        # Initialize best distortions and best attacks globally
+        # Initialize the best distortions and best attacks globally
         o_best_dist = np.inf * np.ones(x_batch.shape[0])
         o_best_attack = x_batch.copy()
 
@@ -297,7 +298,7 @@ class ZooAttack(EvasionAttack):
         c_batch: np.ndarray,
         c_lower_bound: np.ndarray,
         c_upper_bound: np.ndarray,
-    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
         Update constant `c_batch` from the ZOO objective. This characterizes the trade-off between attack strength and
         amount of noise introduced.
@@ -310,11 +311,9 @@ class ZooAttack(EvasionAttack):
         :return: A tuple of three batches of updated constants and lower/upper bounds.
         """
 
-        def compare(object1, object2):
-            return object1 == object2 if self.targeted else object1 != object2
-
         comparison = [
-            compare(best_label[i], np.argmax(y_batch[i])) and best_label[i] != -np.inf for i in range(len(c_batch))
+            self._compare(best_label[i], np.argmax(y_batch[i])) and best_label[i] != -np.inf
+            for i in range(len(c_batch))
         ]
         for i, comp in enumerate(comparison):
             if comp:
@@ -329,20 +328,29 @@ class ZooAttack(EvasionAttack):
 
         return c_batch, c_lower_bound, c_upper_bound
 
+    def _compare(self, object1: Any, object2: Any) -> bool:
+        """
+        Check two objects for equality if the attack is targeted, otherwise check for inequality.
+
+        :param object1: First object to compare.
+        :param object2: Second object to compare.
+        :return: When the attack is targeted, returns "True" if object are equal otherwise "False". When the attack is
+                    untargeted, the function returns "True" when the objects are different otherwise "False".
+
+        """
+        return object1 == object2 if self.targeted else object1 != object2
+
     def _generate_bss(
         self, x_batch: np.ndarray, y_batch: np.ndarray, c_batch: np.ndarray
-    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
         Generate adversarial examples for a batch of inputs with a specific batch of constants.
 
         :param x_batch: A batch of original examples.
         :param y_batch: A batch of targets (0-1 hot).
         :param c_batch: A batch of constants.
-        :return: A tuple of best elastic distances, best labels, best attacks.
+        :return: A tuple of the best elastic distances, best labels, best attacks.
         """
-
-        def compare(object1, object2):
-            return object1 == object2 if self.targeted else object1 != object2
 
         x_orig = x_batch.astype(ART_NUMPY_DTYPE)
         fine_tuning = np.full(x_batch.shape[0], False, dtype=bool)
@@ -363,7 +371,7 @@ class ZooAttack(EvasionAttack):
                 self._current_noise = np.zeros(x_batch.shape, dtype=ART_NUMPY_DTYPE)
             x_adv = x_orig.copy()
 
-        # Initialize best distortions, best changed labels and best attacks
+        # Initialize the best distortions, best changed labels and best attacks
         best_dist = np.inf * np.ones(x_adv.shape[0])
         best_label = -np.inf * np.ones(x_adv.shape[0])
         best_attack = np.array([x_adv[i] for i in range(x_adv.shape[0])])
@@ -415,7 +423,7 @@ class ZooAttack(EvasionAttack):
             # Adjust the best result
             labels_batch = np.argmax(y_batch, axis=1)
             for i, (dist, pred) in enumerate(zip(l2dist, np.argmax(preds, axis=1))):
-                if dist < best_dist[i] and compare(pred, labels_batch[i]):
+                if dist < best_dist[i] and self._compare(pred, labels_batch[i]):
                     best_dist[i] = dist
                     best_attack[i] = x_adv[i]
                     best_label[i] = pred
@@ -528,6 +536,16 @@ class ZooAttack(EvasionAttack):
     ) -> np.ndarray:
         """
         Implementation of the ADAM optimizer for coordinate descent.
+
+        :param losses: Overall loss.
+        :param index: Indices of the coordinates to update.
+        :param mean: The mean of the gradient (first moment).
+        :param var: The uncentered variance of the gradient (second moment).
+        :param current_noise: Current noise.
+        :param learning_rate: Learning rate for Adam optimizer.
+        :param adam_epochs: Epochs to run the Adam optimizer.
+        :param proj: Whether to project the noise to the L_p ball.
+        :return: Updated noise for coordinate descent.
         """
         beta1, beta2 = 0.9, 0.999
 
@@ -536,7 +554,7 @@ class ZooAttack(EvasionAttack):
 
         # ADAM update
         mean[index] = beta1 * mean[index] + (1 - beta1) * grads
-        var[index] = beta2 * var[index] + (1 - beta2) * grads ** 2
+        var[index] = beta2 * var[index] + (1 - beta2) * grads**2
 
         corr = (np.sqrt(1 - np.power(beta2, adam_epochs[index]))) / (1 - np.power(beta1, adam_epochs[index]))
         orig_shape = current_noise.shape
@@ -550,7 +568,7 @@ class ZooAttack(EvasionAttack):
 
         return current_noise.reshape(orig_shape)
 
-    def _reset_adam(self, nb_vars: int, indices: Optional[np.ndarray] = None) -> None:
+    def _reset_adam(self, nb_vars: int, indices: np.ndarray | None = None) -> None:
         # If variables are already there and at the right size, reset values
         if self.adam_mean is not None and self.adam_mean.size == nb_vars:
             if indices is None:

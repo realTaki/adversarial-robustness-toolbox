@@ -17,16 +17,17 @@
 # SOFTWARE.
 """
 This module implements the Projected Gradient Descent attack `ProjectedGradientDescent` as an iterative method in which,
-after each iteration, the perturbation is projected on an lp-ball of specified radius (in addition to clipping the
+after each iteration, the perturbation is projected on a lp-ball of specified radius (in addition to clipping the
 values of the adversarial sample so that it lies in the permitted data range). This is the attack proposed by Madry et
 al. for adversarial training.
 
 | Paper link: https://arxiv.org/abs/1706.06083
 """
-from __future__ import absolute_import, division, print_function, unicode_literals
+
+from __future__ import absolute_import, division, print_function, unicode_literals, annotations
 
 import logging
-from typing import Optional, Union, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 import numpy as np
 from scipy.stats import truncnorm
@@ -48,41 +49,45 @@ logger = logging.getLogger(__name__)
 class ProjectedGradientDescentCommon(FastGradientMethod):
     """
     Common class for different variations of implementation of the Projected Gradient Descent attack. The attack is an
-    iterative method in which, after each iteration, the perturbation is projected on an lp-ball of specified radius (in
+    iterative method in which, after each iteration, the perturbation is projected on a lp-ball of specified radius (in
     addition to clipping the values of the adversarial sample so that it lies in the permitted data range). This is the
     attack proposed by Madry et al. for adversarial training.
 
     | Paper link: https://arxiv.org/abs/1706.06083
     """
 
-    attack_params = FastGradientMethod.attack_params + ["max_iter", "random_eps", "verbose"]
+    attack_params = FastGradientMethod.attack_params + ["decay", "max_iter", "random_eps", "verbose"]
     _estimator_requirements = (BaseEstimator, LossGradientsMixin)
 
     def __init__(
         self,
-        estimator: Union["CLASSIFIER_LOSS_GRADIENTS_TYPE", "OBJECT_DETECTOR_TYPE"],
-        norm: Union[int, float, str] = np.inf,
-        eps: Union[int, float, np.ndarray] = 0.3,
-        eps_step: Union[int, float, np.ndarray] = 0.1,
+        estimator: "CLASSIFIER_LOSS_GRADIENTS_TYPE" | "OBJECT_DETECTOR_TYPE",
+        norm: int | float | str = np.inf,
+        eps: int | float | np.ndarray = 0.3,
+        eps_step: int | float | np.ndarray = 0.1,
+        decay: float | None = None,
         max_iter: int = 100,
         targeted: bool = False,
         num_random_init: int = 0,
         batch_size: int = 32,
         random_eps: bool = False,
-        summary_writer: Union[str, bool, SummaryWriter] = False,
+        summary_writer: str | bool | SummaryWriter = False,
         verbose: bool = True,
     ) -> None:
         """
         Create a :class:`.ProjectedGradientDescentCommon` instance.
 
         :param estimator: A trained classifier.
-        :param norm: The norm of the adversarial perturbation supporting "inf", np.inf, 1 or 2.
+        :param norm: The norm of the adversarial perturbation, supporting  "inf", `np.inf` or a real `p >= 1`.
+                     Currently, when `p` is not infinity, the projection step only rescales the noise, which may be
+                     suboptimal for `p != 2`.
         :param eps: Maximum perturbation that the attacker can introduce.
         :param eps_step: Attack step size (input variation) at each iteration.
         :param random_eps: When True, epsilon is drawn randomly from truncated normal distribution. The literature
             suggests this for FGSM based training to generalize across different epsilons. eps_step is
             modified to preserve the ratio of eps / eps_step. The effectiveness of this method with PGD
             is untested (https://arxiv.org/pdf/1611.01236.pdf).
+        :param decay: Decay factor for accumulating the velocity vector when using momentum.
         :param max_iter: The maximum number of iterations.
         :param targeted: Indicates whether the attack is targeted (True) or untargeted (False).
         :param num_random_init: Number of random initialisations within the epsilon ball. For num_random_init=0
@@ -108,15 +113,16 @@ class ProjectedGradientDescentCommon(FastGradientMethod):
             minimal=False,
             summary_writer=summary_writer,
         )
+        self.decay = decay
         self.max_iter = max_iter
         self.random_eps = random_eps
         self.verbose = verbose
         ProjectedGradientDescentCommon._check_params(self)
 
-        lower: Union[int, float, np.ndarray]
-        upper: Union[int, float, np.ndarray]
-        var_mu: Union[int, float, np.ndarray]
-        sigma: Union[int, float, np.ndarray]
+        lower: int | float | np.ndarray
+        upper: int | float | np.ndarray
+        var_mu: int | float | np.ndarray
+        sigma: int | float | np.ndarray
 
         if self.random_eps:
             if isinstance(eps, (int, float)):
@@ -142,7 +148,7 @@ class ProjectedGradientDescentCommon(FastGradientMethod):
 
             self.eps_step = ratio * self.eps
 
-    def _set_targets(self, x: np.ndarray, y: Optional[np.ndarray], classifier_mixin: bool = True) -> np.ndarray:
+    def _set_targets(self, x: np.ndarray, y: np.ndarray | None, classifier_mixin: bool = True) -> np.ndarray:
         """
         Check and set up targets.
 
@@ -156,7 +162,7 @@ class ProjectedGradientDescentCommon(FastGradientMethod):
         """
         if classifier_mixin:
             if y is not None:
-                y = check_and_transform_label_format(y, self.estimator.nb_classes)
+                y = check_and_transform_label_format(y, nb_classes=self.estimator.nb_classes)
 
         if y is None:
             # Throw error if attack is targeted, but no targets are provided
@@ -176,8 +182,9 @@ class ProjectedGradientDescentCommon(FastGradientMethod):
 
     def _check_params(self) -> None:  # pragma: no cover
 
-        if self.norm not in [1, 2, np.inf, "inf"]:
-            raise ValueError('Norm order must be either 1, 2, `np.inf` or "inf".')
+        norm: float = np.inf if self.norm == "inf" else float(self.norm)
+        if norm < 1:
+            raise ValueError('Norm order must be either "inf", `np.inf` or a real `p >= 1`.')
 
         if not (
             isinstance(self.eps, (int, float))
@@ -225,6 +232,9 @@ class ProjectedGradientDescentCommon(FastGradientMethod):
         if self.max_iter < 0:
             raise ValueError("The number of iterations `max_iter` has to be a non-negative integer.")
 
+        if self.decay is not None and self.decay < 0.0:
+            raise ValueError("The decay factor `decay` has to be a nonnegative float.")
+
         if not isinstance(self.verbose, bool):
             raise ValueError("The verbose has to be a Boolean.")
 
@@ -232,7 +242,7 @@ class ProjectedGradientDescentCommon(FastGradientMethod):
 class ProjectedGradientDescentNumpy(ProjectedGradientDescentCommon):
     """
     The Projected Gradient Descent attack is an iterative method in which, after each iteration, the perturbation is
-    projected on an lp-ball of specified radius (in addition to clipping the values of the adversarial sample so that it
+    projected on a lp-ball of specified radius (in addition to clipping the values of the adversarial sample so that it
     lies in the permitted data range). This is the attack proposed by Madry et al. for adversarial training.
 
     | Paper link: https://arxiv.org/abs/1706.06083
@@ -240,23 +250,26 @@ class ProjectedGradientDescentNumpy(ProjectedGradientDescentCommon):
 
     def __init__(
         self,
-        estimator: Union["CLASSIFIER_LOSS_GRADIENTS_TYPE", "OBJECT_DETECTOR_TYPE"],
-        norm: Union[int, float, str] = np.inf,
-        eps: Union[int, float, np.ndarray] = 0.3,
-        eps_step: Union[int, float, np.ndarray] = 0.1,
+        estimator: "CLASSIFIER_LOSS_GRADIENTS_TYPE" | "OBJECT_DETECTOR_TYPE",
+        norm: int | float | str = np.inf,
+        eps: int | float | np.ndarray = 0.3,
+        eps_step: int | float | np.ndarray = 0.1,
+        decay: float | None = None,
         max_iter: int = 100,
         targeted: bool = False,
         num_random_init: int = 0,
         batch_size: int = 32,
         random_eps: bool = False,
-        summary_writer: Union[str, bool, SummaryWriter] = False,
+        summary_writer: str | bool | SummaryWriter = False,
         verbose: bool = True,
     ) -> None:
         """
         Create a :class:`.ProjectedGradientDescentNumpy` instance.
 
-        :param estimator: An trained estimator.
-        :param norm: The norm of the adversarial perturbation supporting "inf", np.inf, 1 or 2.
+        :param estimator: A trained estimator.
+        :param norm: The norm of the adversarial perturbation, supporting  "inf", `np.inf` or a real `p >= 1`.
+                     Currently, when `p` is not infinity, the projection step only rescales the noise, which may be
+                     suboptimal for `p != 2`.
         :param eps: Maximum perturbation that the attacker can introduce.
         :param eps_step: Attack step size (input variation) at each iteration.
         :param random_eps: When True, epsilon is drawn randomly from truncated normal distribution. The literature
@@ -285,6 +298,7 @@ class ProjectedGradientDescentNumpy(ProjectedGradientDescentCommon):
             norm=norm,
             eps=eps,
             eps_step=eps_step,
+            decay=decay,
             max_iter=max_iter,
             targeted=targeted,
             num_random_init=num_random_init,
@@ -296,7 +310,7 @@ class ProjectedGradientDescentNumpy(ProjectedGradientDescentCommon):
 
         self._project = True
 
-    def generate(self, x: np.ndarray, y: Optional[np.ndarray] = None, **kwargs) -> np.ndarray:
+    def generate(self, x: np.ndarray, y: np.ndarray | None = None, **kwargs) -> np.ndarray:
         """
         Generate adversarial samples and return them in an array.
 
@@ -344,6 +358,8 @@ class ProjectedGradientDescentNumpy(ProjectedGradientDescentCommon):
                         if len(mask.shape) == len(x.shape):
                             mask_batch = mask[batch_index_1:batch_index_2]
 
+                    momentum = np.zeros(batch.shape)
+
                     for i_max_iter in trange(
                         self.max_iter, desc="PGD - Iterations", leave=False, disable=not self.verbose
                     ):
@@ -359,6 +375,8 @@ class ProjectedGradientDescentNumpy(ProjectedGradientDescentCommon):
                             self._project,
                             self.num_random_init > 0 and i_max_iter == 0,
                             self._batch_id,
+                            decay=self.decay,
+                            momentum=momentum,
                         )
 
                     if rand_init_num == 0:
@@ -402,6 +420,8 @@ class ProjectedGradientDescentNumpy(ProjectedGradientDescentCommon):
             else:
                 adv_x = x.astype(ART_NUMPY_DTYPE)
 
+            momentum = np.zeros(adv_x.shape)
+
             for i_max_iter in trange(self.max_iter, desc="PGD - Iterations", disable=not self.verbose):
                 self._i_max_iter = i_max_iter
 
@@ -414,6 +434,8 @@ class ProjectedGradientDescentNumpy(ProjectedGradientDescentCommon):
                     self.eps_step,
                     self._project,
                     self.num_random_init > 0 and i_max_iter == 0,
+                    decay=self.decay,
+                    momentum=momentum,
                 )
 
         if self.summary_writer is not None:

@@ -22,14 +22,132 @@ import unittest
 
 import tensorflow as tf
 import numpy as np
-from keras.preprocessing.image import ImageDataGenerator
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
 
-from art.data_generators import KerasDataGenerator, PyTorchDataGenerator, MXDataGenerator, TensorFlowDataGenerator
-from art.data_generators import TensorFlowV2DataGenerator
+from art.data_generators import KerasDataGenerator, PyTorchDataGenerator
+from art.data_generators import TensorFlowV2DataGenerator, NumpyDataGenerator
 
 from tests.utils import master_seed
 
 logger = logging.getLogger(__name__)
+
+
+class TestNumpyDataGenerator(unittest.TestCase):
+    def setUp(self):
+        self.m = 100
+        self.n = (28, 28, 1)
+        self.x = np.random.random((self.m,) + self.n)
+        self.y = np.arange(self.m)
+        self.batch_size = 30
+
+    def test_gen_interface(self):
+        data_generator = NumpyDataGenerator(
+            self.x,
+            self.y,
+            batch_size=self.batch_size,
+            drop_remainder=True,
+            shuffle=False,
+        )
+        x_batch, y_batch = data_generator.get_batch()
+
+        # Check return types
+        self.assertTrue(isinstance(x_batch, np.ndarray))
+        self.assertTrue(isinstance(y_batch, np.ndarray))
+
+        # Check shapes
+        self.assertEqual(x_batch.shape, (self.batch_size,) + self.n)
+        self.assertEqual(y_batch.shape, (self.batch_size,))
+
+        # Check underlying properties
+        self.assertEqual(data_generator.size, len(self.x))
+        self.assertEqual(data_generator.batch_size, self.batch_size)
+
+    def test_errors(self):
+        for x, y in [
+            (1, [2, 3, 4]),  # x has no __len__
+            ([1, 2], [3, 4, 5]),  # x and y are different lengths
+        ]:
+            with self.assertRaises(ValueError):
+                NumpyDataGenerator(np.array(x), np.array(y))
+
+    def test_drop_remainder_true(self):
+        data_generator = NumpyDataGenerator(
+            self.x,
+            self.y,
+            batch_size=self.batch_size,
+            drop_remainder=True,
+            shuffle=False,
+        )
+        self.assertEqual(data_generator.batches_per_epoch, 3)
+        for i in range(3):
+            data_generator.get_batch()
+        _, y_batch = data_generator.get_batch()
+        self.assertTrue((y_batch == self.y[: self.batch_size]).all())
+
+    def test_nothing_to_drop(self):
+        data_generator = NumpyDataGenerator(
+            self.x,
+            self.y,
+            batch_size=10,
+            drop_remainder=True,
+            shuffle=False,
+        )
+        self.assertEqual(data_generator.batches_per_epoch, 10)
+        for i in range(9):
+            data_generator.get_batch()
+        _, y_batch = data_generator.get_batch()
+        self.assertEqual(len(y_batch), 10)
+
+    def test_drop_remainder_false(self):
+        data_generator = NumpyDataGenerator(
+            self.x,
+            self.y,
+            batch_size=self.batch_size,
+            drop_remainder=False,
+            shuffle=False,
+        )
+        self.assertEqual(data_generator.batches_per_epoch, 4)
+        for i in range(3):
+            data_generator.get_batch()
+        x_batch, _ = data_generator.get_batch()
+        self.assertEqual(len(x_batch), self.m % self.batch_size)
+
+    def test_shuffle(self):
+        """
+        NOTE: assertions may fail randomly, but with negligibly low probability
+            on the order of 1 / (m choose batch_size)
+            Setting the master seed here should avoid that, however
+        """
+        master_seed(seed=42)
+        data_generator = NumpyDataGenerator(
+            self.x,
+            self.y,
+            batch_size=self.batch_size,
+            drop_remainder=True,
+            shuffle=True,
+        )
+        _, y_batch = data_generator.get_batch()
+        self.assertFalse((y_batch == self.y[: self.batch_size]).all())
+
+        # Test shuffling across epochs
+        for i in range(2):
+            data_generator.get_batch()
+        _, y_batch_epoch2 = data_generator.get_batch()
+        self.assertFalse((y_batch == y_batch_epoch2).all())
+
+    def test_single_epoch_generator(self):
+        data_generator = NumpyDataGenerator(
+            self.x,
+            self.y,
+            batch_size=self.batch_size,
+            drop_remainder=True,
+            shuffle=False,
+        )
+        self.assertEqual(data_generator.batches_per_epoch, 3)
+        for i in range(3):
+            data_generator.get_batch()
+        _, y_batch = data_generator.get_batch()
+        self.assertTrue((y_batch == self.y[: self.batch_size]).all())
 
 
 class TestKerasDataGenerator(unittest.TestCase):
@@ -226,184 +344,6 @@ class TestPyTorchGenerator(unittest.TestCase):
             self.data_gen = PyTorchDataGenerator("data_loader", size=10, batch_size=5)
 
 
-class TestMXGenerator(unittest.TestCase):
-    def setUp(self):
-        import mxnet as mx
-
-        master_seed(seed=42, set_mxnet=True)
-
-        x = mx.random.uniform(shape=(10, 1, 5, 5))
-        y = mx.random.uniform(shape=10)
-        dataset = mx.gluon.data.dataset.ArrayDataset(x, y)
-
-        data_loader = mx.gluon.data.DataLoader(dataset, batch_size=5, shuffle=True)
-        self.data_gen = MXDataGenerator(data_loader, size=10, batch_size=5)
-
-    def test_gen_interface(self):
-        x, y = self.data_gen.get_batch()
-
-        # Check return types
-        self.assertTrue(isinstance(x, np.ndarray))
-        self.assertTrue(isinstance(y, np.ndarray))
-
-        # Check shapes
-        self.assertEqual(x.shape, (5, 1, 5, 5))
-        self.assertEqual(y.shape, (5,))
-
-    def test_mxnet_specific(self):
-        import mxnet as mx
-
-        iter_ = iter(self.data_gen.iterator)
-        x, y = next(iter_)
-
-        # Check return types
-        self.assertTrue(isinstance(x, mx.ndarray.NDArray))
-        self.assertTrue(isinstance(y, mx.ndarray.NDArray))
-
-        # Check shapes
-        self.assertEqual(x.shape, (5, 1, 5, 5))
-        self.assertEqual(y.shape, (5,))
-
-    def test_error(self):
-        with self.assertRaises(TypeError):
-            _ = MXDataGenerator("data_loader", size=10, batch_size=5)
-
-
-@unittest.skipIf(tf.__version__[0] == "2", reason="Skip unittests for TensorFlow v2.")
-class TestTensorFlowDataGenerator(unittest.TestCase):
-    def setUp(self):
-        master_seed(seed=42)
-
-        def generator(batch_size=5):
-            while True:
-                yield np.random.rand(batch_size, 5, 5, 1), np.random.randint(0, 10, size=10 * batch_size).reshape(
-                    batch_size, -1
-                )
-
-        self.sess = tf.Session()
-        self.dataset = tf.data.Dataset.from_generator(generator, (tf.float32, tf.int32))
-
-    def tearDown(self):
-        self.sess.close()
-
-    def test_init(self):
-        iter_ = tf.compat.v1.data.make_initializable_iterator(self.dataset)
-        data_gen = TensorFlowDataGenerator(
-            sess=self.sess, iterator=iter_, iterator_type="initializable", iterator_arg={}, size=10, batch_size=5
-        )
-        x, y = data_gen.get_batch()
-
-        # Check return types
-        self.assertTrue(isinstance(x, np.ndarray))
-        self.assertTrue(isinstance(y, np.ndarray))
-
-        # Check shapes
-        self.assertEqual(x.shape, (5, 5, 5, 1))
-        self.assertEqual(y.shape, (5, 10))
-
-    def test_reinit(self):
-        iter_ = tf.data.Iterator.from_structure(
-            tf.compat.v1.data.get_output_types(self.dataset), tf.compat.v1.data.get_output_shapes(self.dataset)
-        )
-        init_op = iter_.make_initializer(self.dataset)
-        data_gen = TensorFlowDataGenerator(
-            sess=self.sess, iterator=iter_, iterator_type="reinitializable", iterator_arg=init_op, size=10, batch_size=5
-        )
-        x, y = data_gen.get_batch()
-
-        # Check return types
-        self.assertTrue(isinstance(x, np.ndarray))
-        self.assertTrue(isinstance(y, np.ndarray))
-
-        # Check shapes
-        self.assertEqual(x.shape, (5, 5, 5, 1))
-        self.assertEqual(y.shape, (5, 10))
-
-    def test_feedable(self):
-        handle = tf.placeholder(tf.string, shape=[])
-        iter_ = tf.data.Iterator.from_string_handle(
-            handle, tf.compat.v1.data.get_output_types(self.dataset), tf.compat.v1.data.get_output_shapes(self.dataset)
-        )
-        feed_iterator = tf.compat.v1.data.make_initializable_iterator(self.dataset)
-        feed_handle = self.sess.run(feed_iterator.string_handle())
-        data_gen = TensorFlowDataGenerator(
-            sess=self.sess,
-            iterator=iter_,
-            iterator_type="feedable",
-            iterator_arg=(feed_iterator, {handle: feed_handle}),
-            size=10,
-            batch_size=5,
-        )
-        x, y = data_gen.get_batch()
-
-        # Check return types
-        self.assertTrue(isinstance(x, np.ndarray))
-        self.assertTrue(isinstance(y, np.ndarray))
-
-        # Check shapes
-        self.assertEqual(x.shape, (5, 5, 5, 1))
-        self.assertEqual(y.shape, (5, 10))
-
-    def test_error(self):
-        handle = tf.placeholder(tf.string, shape=[])
-        iter_ = tf.data.Iterator.from_string_handle(
-            handle, tf.compat.v1.data.get_output_types(self.dataset), tf.compat.v1.data.get_output_shapes(self.dataset)
-        )
-        feed_iterator = tf.compat.v1.data.make_initializable_iterator(self.dataset)
-        feed_handle = self.sess.run(feed_iterator.string_handle())
-
-        with self.assertRaises(TypeError):
-            _ = TensorFlowDataGenerator(
-                sess=self.sess,
-                iterator="iter_",
-                iterator_type="feedable",
-                iterator_arg=(feed_iterator, {handle: feed_handle}),
-                size=10,
-                batch_size=5,
-            )
-
-        with self.assertRaises(TypeError):
-            _ = TensorFlowDataGenerator(
-                sess=self.sess,
-                iterator=iter_,
-                iterator_type="initializable",
-                iterator_arg=(feed_iterator, "{handle: feed_handle}"),
-                size=10,
-                batch_size=5,
-            )
-
-        with self.assertRaises(TypeError):
-            _ = TensorFlowDataGenerator(
-                sess=self.sess,
-                iterator=iter_,
-                iterator_type="reinitializable",
-                iterator_arg=(feed_iterator, "{handle: feed_handle}"),
-                size=10,
-                batch_size=5,
-            )
-
-        with self.assertRaises(TypeError):
-            _ = TensorFlowDataGenerator(
-                sess=self.sess,
-                iterator=iter_,
-                iterator_type="feedable",
-                iterator_arg=[feed_iterator, {handle: feed_handle}],
-                size=10,
-                batch_size=5,
-            )
-
-        with self.assertRaises(TypeError):
-            _ = TensorFlowDataGenerator(
-                sess=self.sess,
-                iterator=iter_,
-                iterator_type="test",
-                iterator_arg=(feed_iterator, {handle: feed_handle}),
-                size=10,
-                batch_size=5,
-            )
-
-
-@unittest.skipIf(tf.__version__[0] == "1", reason="Skip unittests for TensorFlow v1.")
 class TestTensorFlowV2DataGenerator(unittest.TestCase):
     def setUp(self):
         master_seed(seed=42)

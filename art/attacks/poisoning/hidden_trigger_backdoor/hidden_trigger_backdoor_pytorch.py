@@ -38,10 +38,11 @@ This module implements a Hidden Trigger Backdoor attack on Neural Networks.
 
 | Paper link: https://arxiv.org/abs/1910.00033
 """
-from __future__ import absolute_import, division, print_function, unicode_literals
+
+from __future__ import absolute_import, division, print_function, unicode_literals, annotations
 
 import logging
-from typing import List, Optional, Tuple, Union, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 import numpy as np
 from tqdm.auto import trange
@@ -54,7 +55,7 @@ from art.attacks.poisoning.hidden_trigger_backdoor.loss_meter import LossMeter
 from art.utils import check_and_transform_label_format
 
 if TYPE_CHECKING:
-    # pylint: disable=C0412
+
     from art.estimators.classification.pytorch import PyTorchClassifier
 
 logger = logging.getLogger(__name__)
@@ -77,12 +78,12 @@ class HiddenTriggerBackdoorPyTorch(PoisoningAttackWhiteBox):
         classifier: "PyTorchClassifier",
         target: np.ndarray,
         source: np.ndarray,
-        feature_layer: Union[str, int],
+        feature_layer: str | int,
         backdoor: PoisoningAttackBackdoor,
         eps: float = 0.1,
         learning_rate: float = 0.001,
         decay_coeff: float = 0.95,
-        decay_iter: Union[int, List[int]] = 2000,
+        decay_iter: int | list[int] = 2000,
         stopping_threshold: float = 10,
         max_iter: int = 5000,
         batch_size: float = 100,
@@ -132,27 +133,24 @@ class HiddenTriggerBackdoorPyTorch(PoisoningAttackWhiteBox):
         self.verbose = verbose
         self.print_iter = print_iter
 
-    def poison(  # pylint: disable=W0221
-        self, x: np.ndarray, y: Optional[np.ndarray] = None, **kwargs
-    ) -> Tuple[np.ndarray, np.ndarray]:
+    def poison(self, x: np.ndarray, y: np.ndarray | None = None, **kwargs) -> tuple[np.ndarray, np.ndarray]:
         """
         Calls perturbation function on the dataset x and returns only the perturbed input and their
         indices in the dataset.
+
         :param x: An array in the shape NxCxWxH with the points to draw source and target samples from.
-                  Source indicates the class(es) that the backdoor would be added to to cause
-                  misclassification into the target label.
-                  Target indicates the class that the backdoor should cause misclassification into.
-        :param y: The labels of the provided samples. If none, we will use the classifier to label the
-                  data.
-        :return: An tuple holding the `(poison samples, indices in x that the poison samples should replace)`.
+                  Source indicates the class(es) that the backdoor would be added to cause misclassification into the
+                  target label. Target indicates the class that the backdoor should cause misclassification into.
+        :param y: The labels of the provided samples. If none, we will use the classifier to label the data.
+        :return: A tuple holding the `(poison samples, indices in x that the poison samples should replace)`.
         """
-        import torch  # lgtm [py/repeated-import]
+        import torch
 
         data = np.copy(x)
         if y is None:
             estimated_labels = self.estimator.predict(data)
         else:
-            estimated_labels = check_and_transform_label_format(y, self.estimator.nb_classes)
+            estimated_labels = check_and_transform_label_format(y, nb_classes=self.estimator.nb_classes)
 
         # Get indices of target class
         if not self.is_index:
@@ -230,7 +228,7 @@ class HiddenTriggerBackdoorPyTorch(PoisoningAttackWhiteBox):
                         decay_exp = 0
                     else:
                         decay_exp = max(max_index) + 1
-                learning_rate = self.learning_rate * (self.decay_coeff ** decay_exp)
+                learning_rate = self.learning_rate * (self.decay_coeff**decay_exp)
 
                 # Compute the feature representation of the current poisons and
                 # identify the closest trigger sample for each poison
@@ -240,6 +238,8 @@ class HiddenTriggerBackdoorPyTorch(PoisoningAttackWhiteBox):
 
                 for _ in range(feat2.size(0)):
                     dist_min_index = (dist == torch.min(dist)).nonzero().squeeze()
+                    if dist_min_index.dim() > 1:  # If multiple values in dist equal torch.min(dist), return the first.
+                        dist_min_index = dist_min_index[0]
                     feat1[dist_min_index[1]] = feat11[dist_min_index[0]]
                     dist[dist_min_index[0], dist_min_index[1]] = 1e5
 
@@ -248,18 +248,19 @@ class HiddenTriggerBackdoorPyTorch(PoisoningAttackWhiteBox):
                 loss.backward()
 
                 # Update the poison and clip
-                poison_samples = poison_samples - learning_rate * poison_samples.grad
+                if poison_samples.grad is not None:
+                    poison_samples = poison_samples - learning_rate * poison_samples.grad
+                else:
+                    raise ValueError("Gradient term in PyTorch model is `None`.")
                 pert = poison_samples - original_images[cur_index : cur_index + offset]
                 pert = torch.clamp(pert, -self.eps, self.eps).detach_()
                 poison_samples = pert + original_images[cur_index : cur_index + offset]
                 poison_samples = poison_samples.clamp(*self.estimator.clip_values)
 
                 if i % self.print_iter == 0:
-                    print(
-                        f"Batch: {batch_id} | i: {i:5d} | \
+                    print(f"Batch: {batch_id} | i: {i:5d} | \
                         LR: {learning_rate:2.5f} | \
-                        Loss Val: {losses.val:5.3f} | Loss Avg: {losses.avg:5.3f}"
-                    )
+                        Loss Val: {losses.val:5.3f} | Loss Avg: {losses.avg:5.3f}")
 
                 if loss.item() < self.stopping_threshold or i == (self.max_iter - 1):
                     print(f"Max_Loss: {loss.item()}")

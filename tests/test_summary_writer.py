@@ -35,7 +35,9 @@ def fix_get_mnist_subset(get_mnist_dataset):
     yield x_train_mnist[:n_train], y_train_mnist[:n_train], x_test_mnist[:n_test], y_test_mnist[:n_test]
 
 
-@pytest.mark.skip_framework("scikitlearn", "mxnet")
+@pytest.mark.skip_framework(
+    "scikitlearn",
+)
 def test_update_image_classification_sw(art_warning, fix_get_mnist_subset, image_dl_estimator):
     try:
 
@@ -49,7 +51,7 @@ def test_update_image_classification_sw(art_warning, fix_get_mnist_subset, image
             estimator=classifier, max_iter=10, eps=0.3, eps_step=0.03, batch_size=5, verbose=False, summary_writer=swd
         )
 
-        (x_train_mnist, y_train_mnist, x_test_mnist, y_test_mnist) = fix_get_mnist_subset
+        x_train_mnist, y_train_mnist, x_test_mnist, y_test_mnist = fix_get_mnist_subset
 
         attack.generate(x=x_train_mnist, y=y_train_mnist)
 
@@ -63,7 +65,9 @@ def test_update_image_classification_sw(art_warning, fix_get_mnist_subset, image
         art_warning(e)
 
 
-@pytest.mark.skip_framework("scikitlearn", "mxnet")
+@pytest.mark.skip_framework(
+    "scikitlearn",
+)
 @pytest.mark.parametrize("summary_writer", [True, "./"])
 def test_update_image_classification_bool_str(art_warning, fix_get_mnist_subset, image_dl_estimator, summary_writer):
     try:
@@ -82,7 +86,7 @@ def test_update_image_classification_bool_str(art_warning, fix_get_mnist_subset,
             summary_writer=summary_writer,
         )
 
-        (x_train_mnist, y_train_mnist, x_test_mnist, y_test_mnist) = fix_get_mnist_subset
+        x_train_mnist, y_train_mnist, x_test_mnist, y_test_mnist = fix_get_mnist_subset
 
         attack.generate(x=x_train_mnist, y=y_train_mnist)
 
@@ -104,7 +108,7 @@ def test_update_image_object_detection_sw(art_warning, fix_get_mnist_subset, fix
             estimator=frcnn, max_iter=10, eps=0.3, eps_step=0.03, batch_size=5, verbose=False, summary_writer=swd
         )
 
-        (x_train_mnist, y_train_mnist, x_test_mnist, y_test_mnist) = fix_get_mnist_subset
+        x_train_mnist, y_train_mnist, x_test_mnist, y_test_mnist = fix_get_mnist_subset
 
         attack.generate(x=x_train_mnist, y=y_train_mnist)
 

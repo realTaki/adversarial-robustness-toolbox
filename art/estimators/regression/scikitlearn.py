@@ -18,11 +18,14 @@
 """
 This module implements the regressors for scikit-learn models.
 """
+
+from __future__ import annotations
+
 import logging
 import os
 import pickle
 from copy import deepcopy
-from typing import List, Optional, Tuple, Union, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -31,7 +34,7 @@ from art.estimators.regression.regressor import RegressorMixin
 from art import config
 
 if TYPE_CHECKING:
-    # pylint: disable=C0412
+
     import sklearn
 
     from art.utils import CLIP_VALUES_TYPE, PREPROCESSING_TYPE
@@ -42,7 +45,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class ScikitlearnRegressor(RegressorMixin, ScikitlearnEstimator):  # lgtm [py/missing-call-to-init]
+class ScikitlearnRegressor(RegressorMixin, ScikitlearnEstimator):
     """
     Wrapper class for scikit-learn regression models.
     """
@@ -52,9 +55,9 @@ class ScikitlearnRegressor(RegressorMixin, ScikitlearnEstimator):  # lgtm [py/mi
     def __init__(
         self,
         model: "sklearn.base.BaseEstimator",
-        clip_values: Optional["CLIP_VALUES_TYPE"] = None,
-        preprocessing_defences: Union["Preprocessor", List["Preprocessor"], None] = None,
-        postprocessing_defences: Union["Postprocessor", List["Postprocessor"], None] = None,
+        clip_values: "CLIP_VALUES_TYPE" | None = None,
+        preprocessing_defences: "Preprocessor" | list["Preprocessor"] | None = None,
+        postprocessing_defences: "Postprocessor" | list["Postprocessor"] | None = None,
         preprocessing: "PREPROCESSING_TYPE" = (0.0, 1.0),
     ) -> None:
         """
@@ -79,7 +82,7 @@ class ScikitlearnRegressor(RegressorMixin, ScikitlearnEstimator):  # lgtm [py/mi
         self._input_shape = self._get_input_shape(model)
 
     @property
-    def input_shape(self) -> Tuple[int, ...]:
+    def input_shape(self) -> tuple[int, ...]:
         """
         Return the shape of one input sample.
 
@@ -123,7 +126,7 @@ class ScikitlearnRegressor(RegressorMixin, ScikitlearnEstimator):  # lgtm [py/mi
 
         return predictions
 
-    def save(self, filename: str, path: Optional[str] = None) -> None:
+    def save(self, filename: str, path: str | None = None) -> None:
         """
         Save a model to file in the format specific to the backend framework.
 
@@ -142,13 +145,13 @@ class ScikitlearnRegressor(RegressorMixin, ScikitlearnEstimator):  # lgtm [py/mi
         with open(full_path + ".pickle", "wb") as file_pickle:
             pickle.dump(self.model, file=file_pickle)
 
-    def clone_for_refitting(self) -> "ScikitlearnRegressor":  # lgtm [py/inheritance/incorrect-overridden-signature]
+    def clone_for_refitting(self) -> "ScikitlearnRegressor":
         """
         Create a copy of the classifier that can be refit from scratch.
 
         :return: new estimator
         """
-        import sklearn  # lgtm [py/repeated-import]
+        import sklearn
 
         clone = type(self)(sklearn.base.clone(self.model))
         params = self.get_params()
@@ -175,6 +178,17 @@ class ScikitlearnRegressor(RegressorMixin, ScikitlearnEstimator):  # lgtm [py/mi
 
         return (y - self.predict(x)) ** 2
 
+    def compute_loss_from_predictions(self, pred: np.ndarray, y: np.ndarray, **kwargs) -> np.ndarray:
+        """
+        Compute the MSE loss of the regressor for predictions `pred`.
+
+        :param pred: Model predictions.
+        :param y: Target values.
+        :return: Loss values.
+        """
+
+        return (y - pred) ** 2
+
 
 class ScikitlearnDecisionTreeRegressor(ScikitlearnRegressor):
     """
@@ -184,9 +198,9 @@ class ScikitlearnDecisionTreeRegressor(ScikitlearnRegressor):
     def __init__(
         self,
         model: "sklearn.tree.DecisionTreeRegressor",
-        clip_values: Optional["CLIP_VALUES_TYPE"] = None,
-        preprocessing_defences: Union["Preprocessor", List["Preprocessor"], None] = None,
-        postprocessing_defences: Union["Postprocessor", List["Postprocessor"], None] = None,
+        clip_values: "CLIP_VALUES_TYPE" | None = None,
+        preprocessing_defences: "Preprocessor" | list["Preprocessor"] | None = None,
+        postprocessing_defences: "Postprocessor" | list["Postprocessor"] | None = None,
         preprocessing: "PREPROCESSING_TYPE" = (0.0, 1.0),
     ) -> None:
         """
@@ -201,8 +215,8 @@ class ScikitlearnDecisionTreeRegressor(ScikitlearnRegressor):
                used for data preprocessing. The first value will be subtracted from the input. The input will then
                be divided by the second one.
         """
-        # pylint: disable=E0001
-        import sklearn  # lgtm [py/repeated-import]
+
+        import sklearn
 
         if not isinstance(model, sklearn.tree.DecisionTreeRegressor):
             raise TypeError("Model must be of type sklearn.tree.DecisionTreeRegressor.")
@@ -275,10 +289,10 @@ class ScikitlearnDecisionTreeRegressor(ScikitlearnRegressor):
         """
         return self.model.tree_.n_node_samples[node_id]
 
-    def _get_leaf_nodes(self, node_id, i_tree, class_label, box) -> List["LeafNode"]:
+    def _get_leaf_nodes(self, node_id, i_tree, class_label, box) -> list["LeafNode"]:
         from art.metrics.verification_decisions_trees import LeafNode, Box, Interval
 
-        leaf_nodes: List[LeafNode] = []
+        leaf_nodes: list[LeafNode] = []
 
         if self.get_left_child(node_id) != self.get_right_child(node_id):
 

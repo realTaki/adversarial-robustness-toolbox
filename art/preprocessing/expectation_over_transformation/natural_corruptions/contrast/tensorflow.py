@@ -18,8 +18,11 @@
 """
 This module implements EoT of changes in contrast with uniformly sampled factor.
 """
+
+from __future__ import annotations
+
 import logging
-from typing import Tuple, Union, TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -39,8 +42,8 @@ class EoTContrastTensorFlow(EoTTensorFlowV2):
     def __init__(
         self,
         nb_samples: int,
-        clip_values: Tuple[float, float],
-        contrast_factor: Union[float, Tuple[float, float]],
+        clip_values: tuple[float, float],
+        contrast_factor: float | tuple[float, float],
         apply_fit: bool = False,
         apply_predict: bool = True,
     ) -> None:
@@ -65,9 +68,7 @@ class EoTContrastTensorFlow(EoTTensorFlowV2):
         )
         self._check_params()
 
-    def _transform(
-        self, x: "tf.Tensor", y: Optional["tf.Tensor"], **kwargs
-    ) -> Tuple["tf.Tensor", Optional["tf.Tensor"]]:
+    def _transform(self, x: "tf.Tensor", y: "tf.Tensor" | None, **kwargs) -> tuple["tf.Tensor", "tf.Tensor" | None]:
         """
         Transformation of an image with randomly sampled contrast.
 
@@ -75,7 +76,7 @@ class EoTContrastTensorFlow(EoTTensorFlowV2):
         :param y: Label of the samples `x`.
         :return: Transformed samples and labels.
         """
-        import tensorflow as tf  # lgtm [py/repeated-import]
+        import tensorflow as tf
 
         contrast_factor_i = np.random.uniform(low=self.contrast_factor_range[0], high=self.contrast_factor_range[1])
         if x.shape[3] == 3:
@@ -98,7 +99,7 @@ class EoTContrastTensorFlow(EoTTensorFlowV2):
 
     def _check_params(self) -> None:
 
-        # pylint: disable=R0916
+        # pylint: disable=too-many-boolean-expressions
         if not isinstance(self.contrast_factor, (int, float, tuple)) or (
             isinstance(self.contrast_factor, tuple)
             and (

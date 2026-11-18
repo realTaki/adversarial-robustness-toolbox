@@ -1,46 +1,64 @@
-# Adversarial Robustness Toolbox (ART) v1.10
+# Adversarial Robustness Toolbox (ART) v1.20
 <p align="center">
-  <img src="docs/images/art_lfai.png?raw=true" width="467" title="ART logo">
+  <img src="https://raw.githubusercontent.com/Trusted-AI/adversarial-robustness-toolbox/main/docs/images/art_lfai.png" width="467" title="ART logo">
 </p>
 <br />
 
-![Continuous Integration](https://github.com/Trusted-AI/adversarial-robustness-toolbox/workflows/Continuous%20Integration/badge.svg)
 ![CodeQL](https://github.com/Trusted-AI/adversarial-robustness-toolbox/workflows/CodeQL/badge.svg)
 [![Documentation Status](https://readthedocs.org/projects/adversarial-robustness-toolbox/badge/?version=latest)](http://adversarial-robustness-toolbox.readthedocs.io/en/latest/?badge=latest)
 [![PyPI](https://badge.fury.io/py/adversarial-robustness-toolbox.svg)](https://badge.fury.io/py/adversarial-robustness-toolbox)
-[![Language grade: Python](https://img.shields.io/lgtm/grade/python/g/Trusted-AI/adversarial-robustness-toolbox.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/Trusted-AI/adversarial-robustness-toolbox/context:python)
-[![Total alerts](https://img.shields.io/lgtm/alerts/g/Trusted-AI/adversarial-robustness-toolbox.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/Trusted-AI/adversarial-robustness-toolbox/alerts/)
 [![codecov](https://codecov.io/gh/Trusted-AI/adversarial-robustness-toolbox/branch/main/graph/badge.svg)](https://codecov.io/gh/Trusted-AI/adversarial-robustness-toolbox)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![PyPI - Python Version](https://img.shields.io/pypi/pyversions/adversarial-robustness-toolbox)](https://pypi.org/project/adversarial-robustness-toolbox/)
 [![slack-img](https://img.shields.io/badge/chat-on%20slack-yellow.svg)](https://ibm-art.slack.com/)
-[![Downloads](https://pepy.tech/badge/adversarial-robustness-toolbox)](https://pepy.tech/project/adversarial-robustness-toolbox)
-[![Downloads](https://pepy.tech/badge/adversarial-robustness-toolbox/month)](https://pepy.tech/project/adversarial-robustness-toolbox)
+[![Downloads](https://static.pepy.tech/badge/adversarial-robustness-toolbox)](https://pepy.tech/project/adversarial-robustness-toolbox)
+[![Downloads](https://static.pepy.tech/badge/adversarial-robustness-toolbox/month)](https://pepy.tech/project/adversarial-robustness-toolbox)
 [![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/5090/badge)](https://bestpractices.coreinfrastructure.org/projects/5090)
 
 [中文README请按此处](README-cn.md)
 
-Adversarial Robustness Toolbox (ART) is a Python library for Machine Learning Security. ART provides tools that enable
+ <div align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/lfaidata-project-badge-graduate-color_dark.png" width="400" title="LF AI & Data">
+    <source media="(prefers-color-scheme: light)" srcset="docs/images/lfaidata-project-badge-graduate-color.png" width="400" title="LF AI & Data">
+    <img alt="Fallback image description" src="default-image.png" width="400">
+  </picture>
+</div>
+<br />
+
+Adversarial Robustness Toolbox (ART) is a Python library for Machine Learning Security. ART is hosted by the 
+[Linux Foundation AI & Data Foundation](https://lfaidata.foundation) (LF AI & Data). ART provides tools that enable
 developers and researchers to defend and evaluate Machine Learning models and applications against the
 adversarial threats of Evasion, Poisoning, Extraction, and Inference. ART supports all popular machine learning frameworks
-(TensorFlow, Keras, PyTorch, MXNet, scikit-learn, XGBoost, LightGBM, CatBoost, GPy, etc.), all data types
+(TensorFlow, Keras, PyTorch, scikit-learn, XGBoost, LightGBM, CatBoost, GPy, etc.), all data types
 (images, tables, audio, video, etc.) and machine learning tasks (classification, object detection, speech recognition,
 generation, certification, etc.).
 
 ## Adversarial Threats
 
+ <div align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/adversarial_threats_attacker_dark.png" width="400 title="ART Threats">
+    <source media="(prefers-color-scheme: light)" srcset="docs/images/adversarial_threats_attacker.png" width="400 title="ART Threats">
+    <img alt="Fallback image description" src="default-image.png" width="400">
+  </picture>
+</div>
+
 <p align="center">
-  <img src="docs/images/adversarial_threats_attacker.png?raw=true" width="400" title="ART logo">
-  <img src="docs/images/adversarial_threats_art.png?raw=true" width="400" title="ART logo">
+  <img src="docs/images/adversarial_threats_art.png?raw=true" width="400" title="ART Matrix">
 </p>
 <br />
 
 ## ART for Red and Blue Teams (selection)
 
-<p align="center">
-  <img src="docs/images/white_hat_blue_red.png?raw=true" width="800" title="ART Red and Blue Teams">
-</p>
+ <div align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/white_hat_blue_red_dark.png" width="800 title="ART Red and Blue Teams">
+    <source media="(prefers-color-scheme: light)" srcset="docs/images/white_hat_blue_red.png" width="800 title="ART Red and Blue Teams">
+    <img alt="Fallback image description" src="default-image.png" width="800">
+  </picture>
+</div>
 <br />
 
 ## Learn more

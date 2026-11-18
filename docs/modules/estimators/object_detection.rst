@@ -23,9 +23,9 @@ Object Detector PyTorch Faster-RCNN
    :special-members: __init__
    :inherited-members:
 
-Object Detector TensorFlow Faster-RCNN
---------------------------------------
-.. autoclass:: TensorFlowFasterRCNN
+Object Detector PyTorch YOLO
+----------------------------
+.. autoclass:: PyTorchYolo
    :members:
    :special-members: __init__
    :inherited-members:

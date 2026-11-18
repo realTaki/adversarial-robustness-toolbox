@@ -4,13 +4,13 @@
 
 Backdoor Attack DGM ReD
 -----------------------
-.. autoclass:: BackdoorAttackDGMReD
+.. autoclass:: BackdoorAttackDGMReDTensorFlowV2
    :members:
    :special-members:
 
 Backdoor Attack DGM Trail
 -------------------------
-.. autoclass:: BackdoorAttackDGMTrail
+.. autoclass:: BackdoorAttackDGMTrailTensorFlowV2
    :members:
    :special-members:
 
@@ -23,12 +23,6 @@ Adversarial Embedding Attack
 Backdoor Poisoning Attack
 -------------------------
 .. autoclass:: PoisoningAttackBackdoor
-   :members:
-   :special-members:
-
-Gradient Matching Attack
-------------------------------
-.. autoclass:: GradientMatchingAttack
    :members:
    :special-members:
 
@@ -56,8 +50,20 @@ Feature Collision Attack
    :members:
    :special-members:
 
+Gradient Matching Attack
+------------------------
+.. autoclass:: GradientMatchingAttack
+   :members:
+   :special-members:
+
 Poisoning SVM Attack
 --------------------
 .. autoclass:: PoisoningAttackSVM
+   :members:
+   :special-members:
+
+Sleeper Agent Attack
+--------------------
+.. autoclass:: SleeperAgentAttack
    :members:
    :special-members:

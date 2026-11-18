@@ -18,8 +18,11 @@
 """
 This module implements EoT of changes in contrast with uniformly sampled factor.
 """
+
+from __future__ import annotations
+
 import logging
-from typing import Dict, List, Union, Tuple, TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -39,8 +42,8 @@ class EoTContrastPyTorch(EoTPyTorch):
     def __init__(
         self,
         nb_samples: int,
-        clip_values: Tuple[float, float],
-        contrast_factor: Union[float, Tuple[float, float]],
+        clip_values: tuple[float, float],
+        contrast_factor: float | tuple[float, float],
         apply_fit: bool = False,
         apply_predict: bool = True,
     ) -> None:
@@ -66,8 +69,8 @@ class EoTContrastPyTorch(EoTPyTorch):
         self._check_params()
 
     def _transform(
-        self, x: "torch.Tensor", y: Optional[Union["torch.Tensor", List[Dict[str, "torch.Tensor"]]]], **kwargs
-    ) -> Tuple["torch.Tensor", Optional[Union["torch.Tensor", List[Dict[str, "torch.Tensor"]]]]]:
+        self, x: "torch.Tensor", y: "torch.Tensor" | list[dict[str, "torch.Tensor"]] | None, **kwargs
+    ) -> tuple["torch.Tensor", "torch.Tensor" | list[dict[str, "torch.Tensor"]] | None]:
         """
         Transformation of an image with randomly sampled contrast.
 
@@ -75,7 +78,7 @@ class EoTContrastPyTorch(EoTPyTorch):
         :param y: Label of the samples `x`.
         :return: Transformed samples and labels.
         """
-        import torch  # lgtm [py/repeated-import]
+        import torch
 
         contrast_factor_i = np.random.uniform(low=self.contrast_factor_range[0], high=self.contrast_factor_range[1])
         if x.shape[3] == 3:
@@ -98,7 +101,7 @@ class EoTContrastPyTorch(EoTPyTorch):
 
     def _check_params(self) -> None:
 
-        # pylint: disable=R0916
+        # pylint: disable=too-many-boolean-expressions
         if not isinstance(self.contrast_factor, (int, float, tuple)) or (
             isinstance(self.contrast_factor, tuple)
             and (

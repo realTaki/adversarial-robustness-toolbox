@@ -106,7 +106,7 @@ def test_minimal_perturbations_images(art_warning, fix_get_mnist_subset, image_d
         backend_check_adverse_values(attack, fix_get_mnist_subset, expected_values)
 
         # Test eps of array type 1
-        (_, _, x_test_mnist, _) = fix_get_mnist_subset
+        _, _, x_test_mnist, _ = fix_get_mnist_subset
         eps = np.ones(shape=x_test_mnist.shape) * 5.0
         eps_step = np.ones_like(eps) * 0.1
 
@@ -146,7 +146,7 @@ def test_minimal_perturbations_images(art_warning, fix_get_mnist_subset, image_d
         art_warning(e)
 
 
-@pytest.mark.parametrize("norm", [np.inf, 1, 2])
+@pytest.mark.parametrize("norm", [np.inf, 1, 2, 10])
 @pytest.mark.skip_framework("pytorch")  # temporarily skipping for pytorch until find bug fix in bounded test
 @pytest.mark.framework_agnostic
 def test_norm_images(art_warning, norm, fix_get_mnist_subset, image_dl_estimator_for_attack):
@@ -166,7 +166,7 @@ def test_norm_images(art_warning, norm, fix_get_mnist_subset, image_dl_estimator
                 "x_test_mean": ExpectedValue(0.00051374, 0.002),
                 "x_test_min": ExpectedValue(-0.01486498, 0.001),
                 "x_test_max": ExpectedValue(0.014761963, 0.001),
-                "y_test_pred_adv_expected": ExpectedValue(np.asarray([7, 1, 1, 4, 4, 1, 4, 4, 4, 4, 4]), 4),
+                "y_test_pred_adv_expected": ExpectedValue(np.asarray([7, 4, 1, 4, 4, 1, 4, 4, 4, 4, 4]), 4),
             }
         elif norm == 2:
             expected_values = {
@@ -175,6 +175,15 @@ def test_norm_images(art_warning, norm, fix_get_mnist_subset, image_dl_estimator
                 "x_test_max": ExpectedValue(0.209592223, 0.001),
                 "y_test_pred_adv_expected": ExpectedValue(np.asarray([7, 2, 4, 4, 4, 7, 7, 4, 0, 4, 4]), 2),
             }
+        elif norm == 10:
+            expected_values = {
+                "x_test_mean": ExpectedValue(0.007636416, 0.001),
+                "x_test_min": ExpectedValue(-0.211054801, 0.001),
+                "x_test_max": ExpectedValue(0.209592223, 0.001),
+                "y_test_pred_adv_expected": ExpectedValue(np.asarray([4, 2, 4, 7, 0, 4, 7, 7, 2, 3, 0]), 2),
+            }
+        else:
+            raise ValueError("Value of `expected_values` not recognized.")
 
         attack = FastGradientMethod(classifier, eps=1.0, norm=norm, batch_size=128)
 

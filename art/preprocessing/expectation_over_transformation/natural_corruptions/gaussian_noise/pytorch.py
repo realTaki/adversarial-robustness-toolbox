@@ -18,8 +18,11 @@
 """
 This module implements EoT of adding Gaussian noise with uniformly sampled standard deviation.
 """
+
+from __future__ import annotations
+
 import logging
-from typing import Dict, List, Tuple, Union, TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -39,8 +42,8 @@ class EoTGaussianNoisePyTorch(EoTPyTorch):
     def __init__(
         self,
         nb_samples: int,
-        clip_values: Tuple[float, float],
-        std: Union[float, Tuple[float, float]],
+        clip_values: tuple[float, float],
+        std: float | tuple[float, float],
         apply_fit: bool = False,
         apply_predict: bool = True,
     ) -> None:
@@ -64,8 +67,8 @@ class EoTGaussianNoisePyTorch(EoTPyTorch):
         self._check_params()
 
     def _transform(
-        self, x: "torch.Tensor", y: Optional[Union["torch.Tensor", List[Dict[str, "torch.Tensor"]]]], **kwargs
-    ) -> Tuple["torch.Tensor", Optional[Union["torch.Tensor", List[Dict[str, "torch.Tensor"]]]]]:
+        self, x: "torch.Tensor", y: "torch.Tensor" | list[dict[str, "torch.Tensor"]] | None, **kwargs
+    ) -> tuple["torch.Tensor", "torch.Tensor" | list[dict[str, "torch.Tensor"]] | None]:
         """
         Transformation of an image with randomly sampled Gaussian noise.
 
@@ -73,7 +76,7 @@ class EoTGaussianNoisePyTorch(EoTPyTorch):
         :param y: Label of the samples `x`.
         :return: Transformed samples and labels.
         """
-        import torch  # lgtm [py/repeated-import]
+        import torch
 
         std_i = np.random.uniform(low=self.std_range[0], high=self.std_range[1])
         delta_i = torch.normal(mean=torch.zeros_like(x), std=torch.ones_like(x) * std_i)
@@ -81,7 +84,7 @@ class EoTGaussianNoisePyTorch(EoTPyTorch):
 
     def _check_params(self) -> None:
 
-        # pylint: disable=R0916
+        # pylint: disable=too-many-boolean-expressions
         if not isinstance(self.std, (int, float, tuple)) or (
             isinstance(self.std, tuple)
             and (

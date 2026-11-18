@@ -21,10 +21,11 @@ This module implements a wrapper for MP3 compression defence.
 | Please keep in mind the limitations of defences. For details on how to evaluate classifier security in general,
     see https://arxiv.org/abs/1902.06705.
 """
-from __future__ import absolute_import, division, print_function, unicode_literals
+
+from __future__ import absolute_import, division, print_function, unicode_literals, annotations
 
 import logging
-from typing import TYPE_CHECKING, Optional, Tuple
+from typing import TYPE_CHECKING
 
 from art.defences.preprocessor.mp3_compression import Mp3Compression
 from art.defences.preprocessor.preprocessor import PreprocessorPyTorch
@@ -32,7 +33,7 @@ from art.defences.preprocessor.preprocessor import PreprocessorPyTorch
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    # pylint: disable=C0412
+
     import torch
 
 
@@ -83,19 +84,19 @@ class Mp3CompressionPyTorch(PreprocessorPyTorch):
             verbose=verbose,
         )
 
-        class CompressionPyTorchNumpy(Function):  # pylint: disable=W0223
+        class CompressionPyTorchNumpy(Function):  # pylint: disable=abstract-method
             """
             Function running Preprocessor.
             """
 
             @staticmethod
-            def forward(ctx, input):  # pylint: disable=W0622,W0221
+            def forward(ctx, input):  # pylint: disable=redefined-builtin,arguments-differ
                 numpy_input = input.detach().cpu().numpy()
                 result, _ = self.compression_numpy(numpy_input)
                 return input.new(result)
 
             @staticmethod
-            def backward(ctx, grad_output):  # pylint: disable=W0221
+            def backward(ctx, grad_output):
                 numpy_go = grad_output.cpu().numpy()
                 # np.expand_dims(input, axis=[0, 2])
                 result = self.compression_numpy.estimate_gradient(None, numpy_go)
@@ -105,8 +106,8 @@ class Mp3CompressionPyTorch(PreprocessorPyTorch):
         self._compression_pytorch_numpy = CompressionPyTorchNumpy
 
     def forward(
-        self, x: "torch.Tensor", y: Optional["torch.Tensor"] = None
-    ) -> Tuple["torch.Tensor", Optional["torch.Tensor"]]:
+        self, x: "torch.Tensor", y: "torch.Tensor" | None = None
+    ) -> tuple["torch.Tensor", "torch.Tensor" | None]:
         """
         Apply MP3 compression to sample `x`.
 
@@ -115,7 +116,23 @@ class Mp3CompressionPyTorch(PreprocessorPyTorch):
         :param y: Labels of the sample `x`. This function does not affect them in any way.
         :return: Compressed sample.
         """
+        import torch
+
+        ndim = x.ndim
+
+        if ndim == 1:
+            x = torch.unsqueeze(x, dim=0)
+            if self.channels_first:
+                dim = 1
+            else:
+                dim = 2
+            x = torch.unsqueeze(x, dim=dim)
+
         x_compressed = self._compression_pytorch_numpy.apply(x)
+
+        if ndim == 1:
+            x_compressed = torch.squeeze(x_compressed)
+
         return x_compressed, y
 
     def _check_params(self) -> None:

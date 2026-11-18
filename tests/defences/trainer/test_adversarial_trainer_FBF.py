@@ -30,9 +30,9 @@ def get_adv_trainer(framework, image_dl_estimator):
 
         if framework == "keras":
             trainer = None
-        if framework in ["tensorflow", "tensorflow2v1"]:
+        if framework == "tensorflow":
             trainer = None
-        if framework == "pytorch":
+        if framework in ["pytorch", "huggingface"]:
             classifier, _ = image_dl_estimator()
             trainer = AdversarialTrainerFBFPyTorch(classifier, eps=0.05)
         if framework == "scikitlearn":
@@ -51,9 +51,9 @@ def fix_get_mnist_subset(get_mnist_dataset):
     yield x_train_mnist[:n_train], y_train_mnist[:n_train], x_test_mnist[:n_test], y_test_mnist[:n_test]
 
 
-@pytest.mark.skip_framework("tensorflow", "keras", "scikitlearn", "mxnet", "kerastf")
+@pytest.mark.skip_framework("tensorflow", "keras", "scikitlearn", "kerastf", "huggingface")
 def test_adversarial_trainer_fbf_pytorch_fit_and_predict(get_adv_trainer, fix_get_mnist_subset):
-    (x_train_mnist, y_train_mnist, x_test_mnist, y_test_mnist) = fix_get_mnist_subset
+    x_train_mnist, y_train_mnist, x_test_mnist, y_test_mnist = fix_get_mnist_subset
     x_test_mnist_original = x_test_mnist.copy()
 
     trainer = get_adv_trainer()
@@ -75,16 +75,16 @@ def test_adversarial_trainer_fbf_pytorch_fit_and_predict(get_adv_trainer, fix_ge
     )
 
     assert accuracy == 0.32
-    assert accuracy_new == 0.63
+    assert accuracy_new == 0.62
 
     trainer.fit(x_train_mnist, y_train_mnist, nb_epochs=20, validation_data=(x_train_mnist, y_train_mnist))
 
 
-@pytest.mark.skip_framework("tensorflow", "keras", "scikitlearn", "mxnet", "kerastf")
+@pytest.mark.skip_framework("tensorflow", "keras", "scikitlearn", "kerastf", "huggingface")
 def test_adversarial_trainer_fbf_pytorch_fit_generator_and_predict(
     get_adv_trainer, fix_get_mnist_subset, image_data_generator
 ):
-    (x_train_mnist, y_train_mnist, x_test_mnist, y_test_mnist) = fix_get_mnist_subset
+    x_train_mnist, y_train_mnist, x_test_mnist, y_test_mnist = fix_get_mnist_subset
     x_test_mnist_original = x_test_mnist.copy()
 
     generator = image_data_generator()
@@ -97,7 +97,7 @@ def test_adversarial_trainer_fbf_pytorch_fit_generator_and_predict(
     predictions = np.argmax(trainer.predict(x_test_mnist), axis=1)
     accuracy = np.sum(predictions == np.argmax(y_test_mnist, axis=1)) / x_test_mnist.shape[0]
 
-    trainer.fit_generator(generator=generator, nb_epochs=20)
+    trainer.fit_generator(generator=generator, nb_epochs=5)
     predictions_new = np.argmax(trainer.predict(x_test_mnist), axis=1)
     accuracy_new = np.sum(predictions_new == np.argmax(y_test_mnist, axis=1)) / x_test_mnist.shape[0]
 

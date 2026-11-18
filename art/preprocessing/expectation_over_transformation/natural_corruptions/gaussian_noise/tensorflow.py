@@ -18,8 +18,11 @@
 """
 This module implements EoT of adding Gaussian noise with uniformly sampled standard deviation.
 """
+
+from __future__ import annotations
+
 import logging
-from typing import Tuple, Union, TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -39,8 +42,8 @@ class EoTGaussianNoiseTensorFlow(EoTTensorFlowV2):
     def __init__(
         self,
         nb_samples: int,
-        clip_values: Tuple[float, float],
-        std: Union[float, Tuple[float, float]],
+        clip_values: tuple[float, float],
+        std: float | tuple[float, float],
         apply_fit: bool = False,
         apply_predict: bool = True,
     ) -> None:
@@ -63,9 +66,7 @@ class EoTGaussianNoiseTensorFlow(EoTTensorFlowV2):
         self.std_range = (0.0, std) if isinstance(std, (int, float)) else std
         self._check_params()
 
-    def _transform(
-        self, x: "tf.Tensor", y: Optional["tf.Tensor"], **kwargs
-    ) -> Tuple["tf.Tensor", Optional["tf.Tensor"]]:
+    def _transform(self, x: "tf.Tensor", y: "tf.Tensor" | None, **kwargs) -> tuple["tf.Tensor", "tf.Tensor" | None]:
         """
         Transformation of an image with randomly sampled Gaussian noise.
 
@@ -73,7 +74,7 @@ class EoTGaussianNoiseTensorFlow(EoTTensorFlowV2):
         :param y: Label of the samples `x`.
         :return: Transformed samples and labels.
         """
-        import tensorflow as tf  # lgtm [py/repeated-import]
+        import tensorflow as tf
 
         std_i = np.random.uniform(low=self.std_range[0], high=self.std_range[1])
         delta_i = tf.random.normal(shape=x.shape, mean=0.0, stddev=std_i, seed=None)
@@ -81,7 +82,7 @@ class EoTGaussianNoiseTensorFlow(EoTTensorFlowV2):
 
     def _check_params(self) -> None:
 
-        # pylint: disable=R0916
+        # pylint: disable=too-many-boolean-expressions
         if not isinstance(self.std, (int, float, tuple)) or (
             isinstance(self.std, tuple)
             and (

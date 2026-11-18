@@ -4,6 +4,7 @@ and creates adversarial examples using the Fast Gradient Sign Method. Here we us
 it would also be possible to provide a pretrained model to the ART classifier.
 The parameters are chosen for reduced computational requirements of the script and not optimised for accuracy.
 """
+
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
@@ -12,7 +13,6 @@ import numpy as np
 from art.attacks.evasion import FastGradientMethod
 from art.estimators.classification import PyTorchClassifier
 from art.utils import load_mnist
-
 
 # Step 0: Define the neural network model, return logits instead of activation in forward method
 

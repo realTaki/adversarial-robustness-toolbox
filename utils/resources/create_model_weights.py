@@ -15,13 +15,13 @@
 # AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
 # TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-import tensorflow as tf
 import os
 import pickle
+
+import tensorflow as tf
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, Flatten, Conv2D, MaxPooling2D
 from sklearn.linear_model import LogisticRegression
-from art.estimators.classification import SklearnClassifier
 from sklearn.svm import SVC, LinearSVC
 from sklearn.tree import DecisionTreeClassifier, ExtraTreeClassifier
 from sklearn.ensemble import AdaBoostClassifier, BaggingClassifier, ExtraTreesClassifier
@@ -40,7 +40,9 @@ def main_mnist_binary():
     model.add(Flatten())
     model.add(Dense(1, activation="sigmoid"))
 
-    model.compile(loss="binary_crossentropy", optimizer=tf.keras.optimizers.Adam(lr=0.01), metrics=["accuracy"])
+    model.compile(
+        loss="binary_crossentropy", optimizer=tf.keras.optimizers.Adam(learning_rate=0.01), metrics=["accuracy"]
+    )
 
     (x_train, y_train), (_, _), _, _ = load_dataset("mnist")
 
@@ -79,6 +81,52 @@ def main_mnist_binary():
     )
 
 
+def main_diabetes():
+    master_seed(1234)
+
+    model = Sequential()
+    model.add(Dense(100, activation="relu", input_dim=10))
+    model.add(Dense(10, activation="relu"))
+    model.add(Dense(1))
+
+    model.compile(
+        loss="mean_squared_error", optimizer=tf.keras.optimizers.Adam(learning_rate=0.01), metrics=["accuracy"]
+    )
+
+    (x_train, y_train), (_, _), _, _ = load_dataset("diabetes")
+
+    model.fit(x_train, y_train, batch_size=128, epochs=10)
+
+    w_0, b_0 = model.layers[0].get_weights()
+    w_1, b_1 = model.layers[1].get_weights()
+    w_2, b_2 = model.layers[2].get_weights()
+
+    np.save(
+        os.path.join(os.path.dirname(os.path.dirname(__file__)), "resources/models/", "W_DENSE1_DIABETES"),
+        w_0,
+    )
+    np.save(
+        os.path.join(os.path.dirname(os.path.dirname(__file__)), "resources/models/" "B_DENSE1_DIABETES"),
+        b_0,
+    )
+    np.save(
+        os.path.join(os.path.dirname(os.path.dirname(__file__)), "resources/models/" "W_DENSE2_DIABETES"),
+        w_1,
+    )
+    np.save(
+        os.path.join(os.path.dirname(os.path.dirname(__file__)), "resources/models/" "B_DENSE2_DIABETES"),
+        b_1,
+    )
+    np.save(
+        os.path.join(os.path.dirname(os.path.dirname(__file__)), "resources/models/" "W_DENSE3_DIABETES"),
+        w_2,
+    )
+    np.save(
+        os.path.join(os.path.dirname(os.path.dirname(__file__)), "resources/models/" "B_DENSE3_DIABETES"),
+        b_2,
+    )
+
+
 def create_scikit_model_weights():
     master_seed(1234)
 
@@ -90,41 +138,41 @@ def create_scikit_model_weights():
         "extraTreesClassifier": ExtraTreesClassifier(n_estimators=10),
         "gradientBoostingClassifier": GradientBoostingClassifier(n_estimators=10),
         "randomForestClassifier": RandomForestClassifier(n_estimators=10),
-        "logisticRegression": LogisticRegression(solver="lbfgs", multi_class="auto"),
+        "logisticRegression": LogisticRegression(solver="lbfgs"),
         "svc": SVC(gamma="auto"),
         "linearSVC": LinearSVC(),
     }
 
-    clipped_models = {
-        model_name: SklearnClassifier(model=model, clip_values=(0, 1)) for model_name, model in model_list.items()
-    }
-    unclipped_models = {model_name: SklearnClassifier(model=model) for model_name, model in model_list.items()}
+    clipped_models = {model_name: model for model_name, model in model_list.items()}
+    unclipped_models = {model_name: model for model_name, model in model_list.items()}
 
     (x_train_iris, y_train_iris), (_, _), _, _ = load_dataset("iris")
 
+    y_train_iris = np.argmax(y_train_iris, axis=1)
+
     for model_name, model in clipped_models.items():
-        model.fit(x=x_train_iris, y=y_train_iris)
+        model.fit(X=x_train_iris, y=y_train_iris)
         pickle.dump(
             model,
             open(
                 os.path.join(
                     os.path.dirname(os.path.dirname(__file__)),
-                    "utils/resources/models/scikit/",
-                    model_name + "iris_clipped.sav",
+                    "resources/models/scikit/",
+                    "scikit-" + model_name + "-iris-clipped-eq-1.9.1.pickle",
                 ),
                 "wb",
             ),
         )
 
     for model_name, model in unclipped_models.items():
-        model.fit(x=x_train_iris, y=y_train_iris)
+        model.fit(X=x_train_iris, y=y_train_iris)
         pickle.dump(
             model,
             open(
                 os.path.join(
                     os.path.dirname(os.path.dirname(__file__)),
-                    "utils/resources/models/scikit/",
-                    model_name + "iris_unclipped.sav",
+                    "resources/models/scikit/",
+                    "scikit-" + model_name + "-iris-unclipped-eq-1.9.1.pickle",
                 ),
                 "wb",
             ),
@@ -132,5 +180,6 @@ def create_scikit_model_weights():
 
 
 if __name__ == "__main__":
-    main_mnist_binary()
+    # main_mnist_binary()
     create_scikit_model_weights()
+    # main_diabetes()
